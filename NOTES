@@ -1,0 +1,5 @@
+I played around to understand why the GSM covariance looks the way it does. In paritrcular why do the 45 deg. filters have such a large covariance?
+
+#Case 1: I normalized the filters by mean and std. and then fit the model. The filter covariance is rotationally symmetrix in this case (by construction), but the fit covariance is not (it has the diagonal artifacts)
+
+#Case 2: I normalized the filters by median and inter-quartile range. This time the filter covariance looks quite similar to the previous fit covariance, but actually reversed: vertical and horizontal filters have larger covariance. Perhaps this will even things out and the final fit will be more symmetric?

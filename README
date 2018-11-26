@@ -1,0 +1,50 @@
+This code was written by Gregory (Gabriel) Barello while working in the Ahmadian lab at the Univeristy of Oregon (2016/2017).
+
+This code implements an MGSM model, fits it to natural images, and then simulates a number of common scenarios that are used in neuroscience to study contextual modulation in primary visual cortex.
+
+If you just want to run the code and get the results please modify the file '.CONFIG' and replace the text after 'BSDSloc=" with the relative path to your copy of the BSDS200 dataset. Then run 'setup.sh' which will create local directories tha tthe scripts expect to be there, and finally run either 'run_analysis.py' (fit the full segmented model and generate output for a variety of test stumili) or 'fit_central_model.py' (fit only a single filter patch, and run it as a GSM (no segmentation)).
+
+If you do not have the BSDS200 dataset it can be downloaded at: 
+   'https://www2.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/resources.html'
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Brief Description of Files and Directories %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ -- .CONFIG - a config file which currently only stores the relative path to the BSDS dataset. 
+
+ -- filters - a folder containing data samples for various choices of parameters so that they do not need to be re-generated at runtime.
+
+ -- GSM - this folder (also a python module) contains code nessecary for fitting and performing inference on the (M)GSM model. 
+    - __init__.py     	  -  defines this as a python module
+    - MGSM_inference.py   -  contains all the code needed to do inference in the MGSM
+    - MGSM_train.py	  -  contains my EM implementation for fitting the MGSM given data
+
+ -- image_processing - python module which takes images and generates gabor-filtered data from them
+    - image_processing.py -  defines our gabors, contains helper functions for gabor filtering and sampling
+    - test_gratings.py - a module to generate gratings
+    - stimuli .py - a module to generate specific test stimuli.
+    - shrooms.jpg	  -  a test image 
+ 
+ -- images - a folder in which to put images that you want to use in training/testing your MGSM (currently empty)
+
+ -- inference - contains the results from MGSM simulations
+
+ -- logs - contains logs of the runtime output of the fit and analysis
+ 
+ -- old_files - contains old versions of various files (for backup, cheezy version control)
+
+ -- parameters - contains the results of the MGSM fit for various choices of parameters. When you fit an MGSM the parameter fits go here.
+ 
+ -- README - the thing you're reading right now! Tells you whats up.
+
+ -- run_analysis.py - fits an MGSM and simulates it in response to a few stimuli
+
+ -- runfiles - contains the runfiles for the script
+
+ -- utilities - a module for other random stuff
+    - log.py  - a script that defines the "log" class, which handles generating the logfiles
+    - misc.py - other tasks, most notably checking parameter choices and parsing the command line input for run_analysis.py.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
