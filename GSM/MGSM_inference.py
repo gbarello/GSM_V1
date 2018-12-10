@@ -18,6 +18,12 @@ def mplog(x):
 
 import integrate as logint
 
+def dot(x):
+    if len(x) == 1:
+        return x
+    else:
+        return np.dot(x[0],dot(x[1:]))
+
 '''
 
 this module contains functions needed for learning the MGSM and doing inference on the MGSM
@@ -170,6 +176,67 @@ def check_seg(seg):
     return 0
 
 ###
+def get_new_mc_cornoise(xi,mu,II,SQGUF,SU,FmGi,B,sigma):
+
+    A = sigma + xi
+    a = dot([SQGUF,(mu - dot([SU,II]))])
+    b = -dot([FmGi,II])
+
+    xio = np.linalg.inv(np.linalg.ing(A) + np.linalg.ing(B))
+    muo = dot([xio,dot([A,b]) + dot([B,a])])
+
+    x = (a - b)
+    S = A + B
+
+    _,Slogdet = np.linalg.slogdet(S)
+
+    logterm = .5 * (-len(II) * np.log(2 * np.pi) - Slogdet - dot([x,np.linalg.inv(S),x]))
+
+    return logterm,xio,muo    
+
+def att_PIA_iter_cornoise(I,a,cov,ncov,qcov,ucov,F,G):
+    n = len(cov)
+    m = len(I)
+
+    #repeatedly used, independent of I
+    FmGi = np.linalg.inv(F-G)
+    QpU = (qcov + ucov)
+    QGUF = dot([qcor,G]) + dot([ucov,F])
+    sigma = np.linalg.inv(np.linalg.inv(Q) + np.linalg.inv(U))
+    SQGUF = np.linalg.inv(dot([sigma,QGUF]))
+    B = dot([FmGi,QpU,FmGi.transpose()])
+
+    coef = dot([SQGUF,F-G])
+    _,ldcoef = np.linalg.logdet(coef)
+
+    _,ldcov = np.linalg.slogdet(cov + ncov)
+    
+    l2p = m * np.log(2*np.pi)
+    
+    #also repeatedly used
+    _,ldFmGi = np.linalg.slogdet(FmGi)
+    _,ldQpU = np.linalg.slogdet(QpU)
+
+    #get teh diff of subsequent inputs
+    ImI = np.tensordot(I[:-1],F,axis = [[1],[1]]) - I[1:]
+
+    xt = B
+    mt = dot([FmGi,ImI[-1]])
+
+    result = 2 * ldFmGi
+
+    for i in reversed(ImI[1:-1]):
+        logterm,xt,mt = get_new_mc_cornoise(xt,mt,i,SQGUF,SU,FmGi,B,sigma)
+
+        result += logterm + 2 * ldcoef
+
+    fcov = np.linalg.inv(cov) + np.linalg.inv(ncov) + np.linalg.inv(xt)
+    _,ldxcov = np.linalg.slogdet(fcov)
+
+    result += (- l2p - ldcov - dot([I[0],np.linalg.inv(cov + ncov),I[0]])) / 2
+    fI = mt - dot([(np.linalg.inv(cov) + np.linalg.inv(ncov)),ncov,I[0]])
+    
+    result += (- l2p - ldxcov - dot([fI,fcov,fI])) / 2    
 
 def att_PIA_iter(I,a,cov,ncov,qcov,F,log = False):
     n = len(cov)
@@ -1211,7 +1278,7 @@ def np_DXDX_att(C,x):
 def n(C):
     return float(len(C))
 
-def DS(C):
+def D(C):
     return np.linalg.det(C)
 
 ###
