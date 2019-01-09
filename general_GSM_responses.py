@@ -25,7 +25,7 @@ import utilities as utils
 import model_tools
 import image_processing.stimuli as stim
 import image_processing.make_dataset as make_data
-import GSM.MGSM_inference as inference
+import GSM.ATT_GSM_inference as inference
 
 if args["variance"]:
     respF = inference.general_MGSM_p_att

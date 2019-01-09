@@ -22,3 +22,4 @@ images/
 inference/
 model_files/*
 *#*
+.ipynb_checkpoints/

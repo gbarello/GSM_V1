@@ -305,9 +305,7 @@ def run_WDIFF_plots(noise = 0):
             NC = NC*np.linalg.norm(CC)/np.linalg.norm(NC)
 
             NN = np.random.multivariate_normal(np.zeros(len(NC)),NC,[3,NUM_CON])
-            
-            np.savetxt("./covariance_test.csv",CC)
-            
+              
             stim1 = np.array([cc * I1 for cc in np.logspace(CMIN,CMAX,NUM_CON)])
             stim2 = np.array([cc * I2 for cc in np.logspace(CMIN,CMAX,NUM_CON)])
             stim3 = np.array([cc * I3 for cc in np.logspace(CMIN,CMAX,NUM_CON)])
@@ -316,9 +314,9 @@ def run_WDIFF_plots(noise = 0):
             resp2[-1].append(MGSM.gexp(0,stim2 + NN[1]/(k),CC,NC/(k*k)))
             resp3[-1].append(MGSM.gexp(0,stim3 + NN[2]/(k),CC,NC/(k*k)))
             
-            nresp1[-1].append(MGSM.gnn(stim1 + NN[0]/(k),CC)[:,0])
-            nresp2[-1].append(MGSM.gnn(stim2 + NN[0]/(k),CC)[:,0])
-            nresp3[-1].append(MGSM.gnn(stim3 + NN[0]/(k),CC)[:,0])
+            nresp1[-1].append(MGSM.gnn(stim1 + 0*NN[0]/(k),CC)[:,0])
+            nresp2[-1].append(MGSM.gnn(stim2 + 0*NN[0]/(k),CC)[:,0])
+            nresp3[-1].append(MGSM.gnn(stim3 + 0*NN[0]/(k),CC)[:,0])
 
     resp1 = np.array(resp1)
     resp2 = np.array(resp2)
