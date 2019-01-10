@@ -41,6 +41,92 @@ def nc_att_egia_update(a,I,g,p,Q,F,H,R):
 
     return go,P
 
+def get_new_mc_cornoise(xi,mu,II,SQGUFi,SU,FmGi,B,sigma):
+
+    A = sigma + xi
+    a = dot([SQGUFi,(mu + dot([SU,II]))])
+    b = dot([FmGi,II])
+
+    xio = np.linalg.inv(np.linalg.inv(A) + np.linalg.inv(B))
+    muo = dot([xio,dot([A,b]) + dot([B,a])])
+
+    x = (a - b)
+    S = A + B
+
+    _,Slogdet = np.linalg.slogdet(S)
+
+    logterm = .5 * (-len(II) * np.log(2 * np.pi) - Slogdet - dot([x,np.linalg.inv(S),x]))
+
+    return logterm,xio,muo    
+
+def nc_att_PIA_iter(I,a,cov,ncov,qcov,ucov,F,G):
+    n = len(cov)
+    m = len(I)
+
+    #repeatedly used, independent of I
+    FmGi = np.linalg.inv(F-G)
+    QpU = (a*a*qcov + ucov)
+    QGUF = dot([a*a*qcov,G]) + dot([ucov,F])
+    sigma = np.linalg.inv(np.linalg.inv(a*a*qcov) + np.linalg.inv(ucov))
+    SQGUFi = np.linalg.inv(dot([sigma,QGUF]))
+    B = dot([FmGi,QpU,FmGi.transpose()])
+
+    _,ldSQGUFi = np.linalg.slogdet(SQGUFi)
+
+    _,ldcov = np.linalg.slogdet(a*a*cov + ncov)
+    
+    l2p = m * np.log(2*np.pi)
+    
+    #also repeatedly used
+    _,ldFmGi = np.linalg.slogdet(FmGi)
+    _,ldQpU = np.linalg.slogdet(QpU)
+
+    ldcoef = ldSQGUFi + ldFmGi
+
+    #get teh diff of subsequent inputs
+    ImI = np.tensordot(I[:-1],F,axes = [[1],[1]]) - I[1:]
+
+    xt = B
+    mt = dot([FmGi,ImI[-1]])
+
+    #if there is just one frame, then this is the result:
+    if len(I) == 1:
+        result = (- l2p - ldcov - dot([I[0],np.linalg.inv(a*a*cov + ncov),I[0]]))/2.
+
+    
+    #otherwise, initialize the result 
+
+    result = 2 * ldFmGi
+
+    for i in reversed(ImI[1:-1]):
+        logterm,xt,mt = get_new_mc_cornoise(xt,mt,i,SQGUFi,SU,FmGi,B,sigma)
+
+        result += logterm + 2 * ldcoef
+
+    fcov = np.linalg.inv(cov) + np.linalg.inv(ncov) + np.linalg.inv(xt)
+    _,ldxcov = np.linalg.slogdet(fcov)
+
+    result += (- l2p - ldcov - dot([I[0],np.linalg.inv(cov + ncov),I[0]])) / 2
+    fI = mt - dot([(np.linalg.inv(cov) + np.linalg.inv(ncov)),ncov,I[0]])
+    
+    result += (- l2p - ldxcov - dot([fI,fcov,fI])) / 2
+
+    return result
+
+def nc_att_integrand(n,I,a,cov,ncov,qcov,ucov,F,G):
+
+    pia = nc_att_PIA_iter(I,a,cov,ncov,qcov,ucov,F,G)
+    gia = nc_att_egia(n,I,a,cov,ncov,qcov,ucov,F,G)
+    
+    return pia*gia*Pa(a)
+
+def nc_att_norm(I,a,cov,ncov,qcov,ucov,F,G):
+
+    pia = nc_att_PIA_iter(I,a,cov,ncov,qcov,ucov,F,G)
+    
+    return pia*Pa(a)
+
+
 def nc_att_gexp(n,x,cov,ncov,qcov,ucov,F,G):
     
     TOP = [INT(lambda a: nc_att_integrand(n,x[k],a,cov,ncov,qcov,ucov,F,G),0,np.inf)[0] for k in range(len(x))]
@@ -589,22 +675,29 @@ def get_att_CC_seg_weight(X1,X2,CC,CCS,CS,NCC,NCCS,NCS,QCC,QCCS,QCS,FCC,FCCS,FCS
 
 if __name__ == "__main__":
 
+    import ATT_GSM_inference as att
+
     def mat_sq(m):
         return np.dot(m,m.transpose())
     
-    I = np.random.randn(2,10)
+    I = np.random.randn(2,2,10)
     a = 1.
     cov = mat_sq(np.random.randn(10,10))
     ncov = mat_sq(np.random.randn(10,10))
     qcov = mat_sq(np.random.randn(10,10))
-    ucov = .1*mat_sq(np.random.randn(10,10))
+    ucov = ncov#.1*mat_sq(np.random.randn(10,10))
     F = .9*np.eye(10)
-    G = .5*np.eye(10)
+    G = 0*np.eye(10)
     n = 0
     
-    res = nc_att_egia(n,I,a,cov,ncov,qcov,ucov,F,G,getall = False,getP = False)
+    res = nc_att_egia(n,I[0],a,cov,ncov,qcov,ucov,F,G,getall = False,getP = False)
     #res = att_egia(n,I,a,cov,ncov,qcov,F)
 
     print(res)
 
+    gg1 = nc_att_gexp(n,I,cov,ncov,qcov,ucov,F,G)
+    gg2 = att.att_gexp(n,I,cov,ncov,qcov,F)
+
+    print(gg1)
     
+    print(gg2)

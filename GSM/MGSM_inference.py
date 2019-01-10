@@ -178,77 +178,6 @@ def check_seg(seg):
     return 0
 
 ###
-def get_new_mc_cornoise(xi,mu,II,SQGUFi,SU,FmGi,B,sigma):
-
-    A = sigma + xi
-    a = dot([SQGUFi,(mu + dot([SU,II]))])
-    b = dot([FmGi,II])
-
-    xio = np.linalg.inv(np.linalg.inv(A) + np.linalg.inv(B))
-    muo = dot([xio,dot([A,b]) + dot([B,a])])
-
-    x = (a - b)
-    S = A + B
-
-    _,Slogdet = np.linalg.slogdet(S)
-
-    logterm = .5 * (-len(II) * np.log(2 * np.pi) - Slogdet - dot([x,np.linalg.inv(S),x]))
-
-    return logterm,xio,muo    
-
-def att_PIA_iter_cornoise(I,a,cov,ncov,qcov,ucov,F,G):
-    n = len(cov)
-    m = len(I)
-
-    #repeatedly used, independent of I
-    FmGi = np.linalg.inv(F-G)
-    QpU = (a*a*qcov + ucov)
-    QGUF = dot([a*a*qcor,G]) + dot([ucov,F])
-    sigma = np.linalg.inv(np.linalg.inv(a*a*qcor) + np.linalg.inv(U))
-    SQGUFi = np.linalg.inv(dot([sigma,QGUF]))
-    B = dot([FmGi,QpU,FmGi.transpose()])
-
-    _,ldSQGUFi = np.linalg.logdet(SQGUFi)
-
-    _,ldcov = np.linalg.slogdet(a*a*cov + ncov)
-    
-    l2p = m * np.log(2*np.pi)
-    
-    #also repeatedly used
-    _,ldFmGi = np.linalg.slogdet(FmGi)
-    _,ldQpU = np.linalg.slogdet(QpU)
-
-    ldcoef = ldSQGUFi + ldFmGi
-
-    #get teh diff of subsequent inputs
-    ImI = np.tensordot(I[:-1],F,axis = [[1],[1]]) - I[1:]
-
-    xt = B
-    mt = dot([FmGi,ImI[-1]])
-
-    #if there is just one frame, then this is the result:
-    if len(I) == 1:
-        result = (- l2p - ldcov - dot([I[0],np.linalg.inv(a*a*cov + ncov),I[0]]))/2.
-
-    
-    #otherwise, initialize the result 
-
-    result = 2 * ldFmGi
-
-    for i in reversed(ImI[1:-1]):
-        logterm,xt,mt = get_new_mc_cornoise(xt,mt,i,SQGUFi,SU,FmGi,B,sigma)
-
-        result += logterm + 2 * ldcoef
-
-    fcov = np.linalg.inv(cov) + np.linalg.inv(ncov) + np.linalg.inv(xt)
-    _,ldxcov = np.linalg.slogdet(fcov)
-
-    result += (- l2p - ldcov - dot([I[0],np.linalg.inv(cov + ncov),I[0]])) / 2
-    fI = mt - dot([(np.linalg.inv(cov) + np.linalg.inv(ncov)),ncov,I[0]])
-    
-    result += (- l2p - ldxcov - dot([fI,fcov,fI])) / 2
-
-    return result
 
 def att_PIA_iter(I,a,cov,ncov,qcov,F,log = False):
     n = len(cov)
@@ -530,6 +459,39 @@ def integrand(n,x,a,cov,ncov,prec = None):
     out = pgia*pia*Pa(a)
     
     return out
+
+
+def att_egia(n,I,a,cov,ncov,qcov,F,getall = False,getP = False):
+    #we're basically going to perform 2 steps of kalman update equations starting with the prior
+    #I can be a list of images, and I will write it recursively to handle any number
+
+    out = []
+    pout = []
+    g = np.zeros(len(cov))
+    p = cov
+
+    for i in I:        
+        g,p = att_egia_update(a,i,g,p,ncov,qcov,F)
+        out.append(g)
+        pout.append(p)
+        g = np.dot(F,g)
+        p = np.dot(F,np.dot(p,np.transpose(F))) + qcov
+        
+    if getP:
+        return np.array(out),np.array(pout)
+    
+    if getall:
+        return np.array(out)
+    
+    return out[-1][n]
+
+def att_egia_update(a,I,g,p,ncov,q,F):
+    K = a*np.dot(p,np.linalg.inv(a*a*p + ncov))
+
+    go = g + np.dot(K,I - a*g)
+    P = np.dot(np.identity(len(I)) - a*K,p)
+
+    return go,P
 
 def att_integrand(n,I,a,cov,ncov,qcov,F):
 
