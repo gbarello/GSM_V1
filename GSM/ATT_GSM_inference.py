@@ -3,12 +3,12 @@ from MGSM_inference import *
 def att_egia(n,I,a,cov,ncov,qcov,F,getall = False,getP = False):
     #we're basically going to perform 2 steps of kalman update equations starting with the prior
     #I can be a list of images, and I will write it recursively to handle any number
-
-    out = []
-    pout = []
+    
     g = np.zeros(len(cov))
     p = cov
-
+    out = [g]
+    pout = [p]
+    
     for i in I:        
         g,p = att_egia_update(a,i,g,p,ncov,qcov,F)
         out.append(g)
@@ -56,6 +56,102 @@ def att_helper_1_cov(a,cov,ncov,qcov):
 
     return np.linalg.inv(CC),logdet
 
+def att_PIA_iter_OLD(I,a,cov,ncov,qcov,F,log = True):
+    
+    n = len(cov)
+    m = len(I)
+
+    iF = np.linalg.inv(F)
+
+    s,logdetF = np.linalg.slogdet(F)
+
+    em = I[0]/a
+    xi = ncov/(a*a)
+    
+    out = - n*m*np.log(a)
+
+    for k in range(m-1):
+        tempcov = (ncov/a/a) + np.dot(np.dot(F.transpose(),xi + qcov),F)
+        temparg = np.dot(iF,em) - (I[k+1]/a)
+        
+        s,logdet = np.linalg.slogdet(tempcov)
+        
+        out -= n*np.log(2*np.pi)/2 + logdetF
+        out -= logdet/2
+        out -= np.dot(np.dot(temparg,np.linalg.inv(tempcov)),temparg)/2
+        
+        em,xi = get_new_mc_old(em,xi,I[k+1]/a,ncov/a/a,qcov,F)
+
+    s,logdet = np.linalg.slogdet(xi + cov)
+    
+    out -= n*np.log(2*np.pi)/2
+    out -= logdet/2
+    out -= np.dot(np.dot(em,np.linalg.inv(xi + cov)),em)/2
+
+    if log:
+        return(out)
+    else:
+        return np.exp(out)
+
+
+def att_PIA_iter(I,a,cov,ncov,qcov,F,log = True):
+    
+    n = len(cov)
+    m = len(I)
+
+    C = a*a*cov
+    Q = a*a*qcov
+
+    iF = np.linalg.inv(F)
+    s,ldF = np.linalg.slogdet(F)
+
+    mu = I[-1]
+    xi = ncov
+
+    if len(I) == 1:
+        Vtemp = mu
+        Ctemp = xi + C
+        _,ld = np.linalg.slogdet(Ctemp)
+        return (- n * np.log(2*np.pi) - ld - dot([Vtemp,inv(Ctemp),Vtemp]))/2
+
+    out = 0
+
+    for k in reversed(range(1,len(I))):
+        Ctemp = ncov + dot([iF,xi + Q,iF.transpose()])
+        _,ldtemp = np.linalg.slogdet(Ctemp)
+        Vtemp = dot([iF,mu]) - I[k-1]
+        out += ldF - (n * np.log(2*np.pi) + ldtemp + dot([Vtemp,inv(Ctemp),Vtemp]))/2
+        mu,xi = get_new_mc(mu,xi,I[k-1],C,Q,ncov,iF)
+        
+    Ctemp = C + xi
+    _,ldtemp = np.linalg.slogdet(Ctemp)
+    Vtemp = mu
+
+    out += ldF - (n * np.log(2*np.pi) + ldtemp + dot([Vtemp,inv(Ctemp),Vtemp]))/2
+    
+    if log:
+        return(out)
+    else:
+        return np.exp(out)
+
+
+def inv(x):
+    return np.linalg.inv(x)
+
+def get_new_mc_old(m,x,mu,cov,qcov,F):
+    tempcov = np.dot(np.dot(np.transpose(F),x+qcov),F)
+    xi = inv(inv(cov) + inv(tempcov))
+    em = np.dot(xi,np.dot(inv(cov),mu)+np.dot(inv(tempcov),np.dot(inv(F),m)))
+
+    return em,xi
+
+def get_new_mc(mu,xi,I,cov,qcov,ncov,iF):
+    tempcov = dot([iF,xi + qcov,iF.transpose()])
+    ixi = inv(ncov) + inv(tempcov)
+    xi = inv(ixi)
+    em = dot([ixi,(dot([ncov,iF,mu]) + dot([tempcov,I]))])
+
+    return em,xi
 
 def att_gnn(x,cov,qcov,F):
     lam = sum([LAM(x[:,0],cov)**2] + [LAM(x[:,i] - np.tensordot(x[:,i-1],F,axis = [1,1]),qcov)**2 for i in range(1,len(x[0]))])
@@ -580,7 +676,7 @@ def att_PShared(I,cov,ncov,qcov,F,log = False):
     out =  np.array([INT(lambda x:pfunc(np.reshape(I1[f],[-1]),np.reshape(I2[f],[-1]),x),0,np.inf)[0] for f in range(len(I1))])
     '''
     
-    out =  np.array([INT(lambda a:att_PIA_iter(i,a,cov,ncov,qcov,F)*Pa(a),0,np.inf,limit = 100)[0] for i in I])
+    out =  np.array([INT(lambda a:att_PIA_iter(i,a,cov,ncov,qcov,F,log = False)*Pa(a),0,np.inf,limit = 100)[0] for i in I])
 
 
         

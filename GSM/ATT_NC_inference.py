@@ -6,9 +6,10 @@ def nc_att_egia(n,I,a,cov,ncov,qcov,ucov,F,G,getall = False,getP = False):
 
     g = np.zeros(len(cov) + len(ncov))
     p = scipy.linalg.block_diag(cov,ncov)
+    
     out = [g]
     pout = [p]
-
+    
     QQ = scipy.linalg.block_diag(qcov,ucov)
     FF = scipy.linalg.block_diag(F,G)
     H = np.concatenate([a*np.eye(len(cov)),np.zeros_like(ncov)],axis = 1)
@@ -55,7 +56,7 @@ def get_new_mc_cornoise(xi,mu,II,SQGUFi,SU,FmGi,B,sigma):
 
     _,Slogdet = np.linalg.slogdet(S)
 
-    logterm = .5 * (-len(II) * np.log(2 * np.pi) - Slogdet - dot([x,np.linalg.inv(S),x]))
+    logterm = (-len(II) * np.log(2 * np.pi) - Slogdet - dot([x,np.linalg.inv(S),x]))/2
 
     return logterm,xio,muo    
 
@@ -70,12 +71,13 @@ def nc_att_PIA_iter(I,a,cov,ncov,qcov,ucov,F,G):
     sigma = np.linalg.inv(np.linalg.inv(a*a*qcov) + np.linalg.inv(ucov))
     SQGUFi = np.linalg.inv(dot([sigma,QGUF]))
     B = dot([FmGi,QpU,FmGi.transpose()])
+    SU = dot([sigma,ucov])
 
     _,ldSQGUFi = np.linalg.slogdet(SQGUFi)
 
     _,ldcov = np.linalg.slogdet(a*a*cov + ncov)
     
-    l2p = m * np.log(2*np.pi)
+    l2p = m * n * np.log(2*np.pi)
     
     #also repeatedly used
     _,ldFmGi = np.linalg.slogdet(FmGi)
@@ -86,28 +88,30 @@ def nc_att_PIA_iter(I,a,cov,ncov,qcov,ucov,F,G):
     #get teh diff of subsequent inputs
     ImI = np.tensordot(I[:-1],F,axes = [[1],[1]]) - I[1:]
 
-    xt = B
-    mt = dot([FmGi,ImI[-1]])
+
+    #this is actually the constribution from the first image (same even when many frames are present)
+    result = (- l2p - ldcov - dot([I[0],np.linalg.inv(a*a*cov + ncov),I[0]]))/2.
 
     #if there is just one frame, then this is the result:
     if len(I) == 1:
-        result = (- l2p - ldcov - dot([I[0],np.linalg.inv(a*a*cov + ncov),I[0]]))/2.
-
+        return result
     
-    #otherwise, initialize the result 
+    #otherwise, go for it
+    xt = B
+    mt = dot([FmGi,ImI[-1]])
 
-    result = 2 * ldFmGi
+    result += ldFmGi# * 2 #I think this is just suppposed to be a single det[F-G]
 
-    for i in reversed(ImI[1:-1]):
+    for i in reversed(ImI[:-1]):
         logterm,xt,mt = get_new_mc_cornoise(xt,mt,i,SQGUFi,SU,FmGi,B,sigma)
 
-        result += logterm + 2 * ldcoef
+        result += logterm + ldcoef# * 2#same with this factor of 2
 
-    fcov = np.linalg.inv(cov) + np.linalg.inv(ncov) + np.linalg.inv(xt)
+    fcov = np.linalg.inv(np.linalg.inv(a*a*cov) + np.linalg.inv(ncov)) + xt # this changed from inv(a^-1 + b^-1 + c^-1)
+    
     _,ldxcov = np.linalg.slogdet(fcov)
-
-    result += (- l2p - ldcov - dot([I[0],np.linalg.inv(cov + ncov),I[0]])) / 2
-    fI = mt - dot([(np.linalg.inv(cov) + np.linalg.inv(ncov)),ncov,I[0]])
+    
+    fI = mt - dot([(np.linalg.inv(a*a*cov) + np.linalg.inv(ncov)),ncov,I[0]])
     
     result += (- l2p - ldxcov - dot([fI,fcov,fI])) / 2
 
@@ -676,28 +680,44 @@ def get_att_CC_seg_weight(X1,X2,CC,CCS,CS,NCC,NCCS,NCS,QCC,QCCS,QCS,FCC,FCCS,FCS
 if __name__ == "__main__":
 
     import ATT_GSM_inference as att
+    np.random.seed(0)
 
     def mat_sq(m):
         return np.dot(m,m.transpose())
     
-    I = np.random.randn(2,2,10)
-    a = 1.
+    I = np.random.randn(2,1,10)
+    I = np.ones([2,2,10])
+    
+    a = 2.
     cov = mat_sq(np.random.randn(10,10))
     ncov = mat_sq(np.random.randn(10,10))
-    qcov = mat_sq(np.random.randn(10,10))
-    ucov = ncov#.1*mat_sq(np.random.randn(10,10))
+
     F = .9*np.eye(10)
     G = 0*np.eye(10)
+
+    qcov = Q_self_con(cov,F)#mat_sq(np.random.randn(10,10))
+    ucov = Q_self_con(ncov,G)#)ncov#.1*mat_sq(np.random.randn(10,10))
+
+    print("noise cov:",np.sum((ucov - ncov)**2))
+
     n = 0
     
-    res = nc_att_egia(n,I[0],a,cov,ncov,qcov,ucov,F,G,getall = False,getP = False)
-    #res = att_egia(n,I,a,cov,ncov,qcov,F)
-
-    print(res)
-
-    gg1 = nc_att_gexp(n,I,cov,ncov,qcov,ucov,F,G)
-    gg2 = att.att_gexp(n,I,cov,ncov,qcov,F)
-
-    print(gg1)
+    print("Testing")
     
-    print(gg2)
+    g1 = nc_att_egia(n,I[0],a,cov,ncov,qcov,ucov,F,G,getall = True)
+    g2 = att.att_egia(n,I[0],a,cov,ncov,qcov,F,getall = True)
+    
+    print(((g1[:,:10] - g2)**2).sum())
+    #exit()
+    
+    print("Testing PIA")
+    
+    p1 = nc_att_PIA_iter(I[0],a,cov,ncov,qcov,ucov,F,G)
+    p2 = att.att_PIA_iter(I[0],a,cov,ncov,qcov,F,log = True)
+    p3 = att.att_PIA_iter_OLD(I[0],a,cov,ncov,qcov,F,log = True)
+    print(p1)
+    print(p2)
+    print(p3)
+    exit()
+
+   
