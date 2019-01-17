@@ -104,30 +104,46 @@ def att_PIA_iter(I,a,cov,ncov,qcov,F,log = True):
 
     iF = np.linalg.inv(F)
     s,ldF = np.linalg.slogdet(F)
+    _,ldcov = np.linalg.slogdet(C + ncov)
 
-    mu = I[-1]
-    xi = ncov
+    mu = dot([iF,I[-1]])
+    xi = dot([iF,ncov + Q,iF.transpose()])
+
+    l2p = n * np.log(2*np.pi)
 
     if len(I) == 1:
-        Vtemp = mu
-        Ctemp = xi + C
-        _,ld = np.linalg.slogdet(Ctemp)
-        return (- n * np.log(2*np.pi) - ld - dot([Vtemp,inv(Ctemp),Vtemp]))/2
-
-    out = 0
-
-    for k in reversed(range(1,len(I))):
-        Ctemp = ncov + dot([iF,xi + Q,iF.transpose()])
-        _,ldtemp = np.linalg.slogdet(Ctemp)
-        Vtemp = dot([iF,mu]) - I[k-1]
-        out += ldF - (n * np.log(2*np.pi) + ldtemp + dot([Vtemp,inv(Ctemp),Vtemp]))/2
-        mu,xi = get_new_mc(mu,xi,I[k-1],C,Q,ncov,iF)
+        result = (-l2p - ldcov - dot([I[0],inv(C + ncov),I[0]]))/2
+        return result
+    
+    result = - ldF
         
-    Ctemp = C + xi
-    _,ldtemp = np.linalg.slogdet(Ctemp)
-    Vtemp = mu
+    for i in reversed(I[1:-1]):
+        X = inv(inv(ncov) + inv(xi))
+        eta = dot([inv(X),dot([ncov,mu]) + dot([xi,i])])
 
-    out += ldF - (n * np.log(2*np.pi) + ldtemp + dot([Vtemp,inv(Ctemp),Vtemp]))/2
+        temp_cov = ncov + xi
+        temp_vec = mu - i
+        _,ldtemp = np.linalg.slogdet(temp_cov)
+        result += - ldF + (-l2p - ldtemp - dot([temp_vec,inv(temp_cov),temp_vec]))/2
+
+        xi = dot([iF,X + Q,iF.transpose()])
+        mu = dot([iF,inv(X),dot([ncov,mu]) + dot([xi,i])])
+        
+    X = inv(inv(ncov) + inv(xi))
+    eta = dot([inv(X),dot([ncov,mu]) + dot([xi,I[0]])])
+
+    temp_cov = ncov + xi
+    temp_vec = mu - I[0]
+    _,ldtemp = np.linalg.slogdet(temp_cov)
+    result += (-l2p - ldtemp - dot([temp_vec,inv(temp_cov),temp_vec]))/2
+
+    temp_cov = C + X
+    temp_vec = eta
+    _,ldtemp = np.linalg.slogdet(temp_cov)
+
+    result += (-l2p - ldtemp - dot([temp_vec,inv(temp_cov),temp_vec]))/2
+
+    out = result
     
     if log:
         return(out)
