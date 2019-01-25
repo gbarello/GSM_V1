@@ -55,119 +55,142 @@ def att_helper_1_cov(a,cov,ncov,qcov):
     s,logdet = np.linalg.slogdet(CC)
 
     return np.linalg.inv(CC),logdet
-
-def att_PIA_iter_OLD(I,a,cov,ncov,qcov,F,log = True):
-    
-    n = len(cov)
-    m = len(I)
-
-    iF = np.linalg.inv(F)
-
-    s,logdetF = np.linalg.slogdet(F)
-
-    em = I[0]/a
-    xi = ncov/(a*a)
-    
-    out = - n*m*np.log(a)
-
-    for k in range(m-1):
-        tempcov = (ncov/a/a) + np.dot(np.dot(F.transpose(),xi + qcov),F)
-        temparg = np.dot(iF,em) - (I[k+1]/a)
+def logterm(m,C,logdet = None):
+    if logdet is None:
+        _,logdet = np.linalg.slogdet(C)
         
-        s,logdet = np.linalg.slogdet(tempcov)
-        
-        out -= n*np.log(2*np.pi)/2 + logdetF
-        out -= logdet/2
-        out -= np.dot(np.dot(temparg,np.linalg.inv(tempcov)),temparg)/2
-        
-        em,xi = get_new_mc_old(em,xi,I[k+1]/a,ncov/a/a,qcov,F)
+    return -(len(m) * np.log(2*np.pi) + logdet + dot([m,inv(C),m]))/2
 
-    s,logdet = np.linalg.slogdet(xi + cov)
-    
-    out -= n*np.log(2*np.pi)/2
-    out -= logdet/2
-    out -= np.dot(np.dot(em,np.linalg.inv(xi + cov)),em)/2
-
-    if log:
-        return(out)
-    else:
-        return np.exp(out)
-
-
-def att_PIA_iter(I,a,cov,ncov,qcov,F,log = True):
-    
-    n = len(cov)
-    m = len(I)
+def att_PIA_iter(I,a,cov,ncov,qcov,F,log = True,method = 2):
 
     C = a*a*cov
     Q = a*a*qcov
 
-    iF = np.linalg.inv(F)
-    s,ldF = np.linalg.slogdet(F)
+    n = I.shape[-1]
+
+    l2p = n*np.log(2*np.pi)
     _,ldcov = np.linalg.slogdet(C + ncov)
-
-    mu = dot([iF,I[-1]])
-    xi = dot([iF,ncov + Q,iF.transpose()])
-
-    l2p = n * np.log(2*np.pi)
-
+    
     if len(I) == 1:
-        result = (-l2p - ldcov - dot([I[0],inv(C + ncov),I[0]]))/2
-        return result
-    
-    result = - ldF
-        
-    for i in reversed(I[1:-1]):
-        X = inv(inv(ncov) + inv(xi))
-        eta = dot([inv(X),dot([ncov,mu]) + dot([xi,i])])
+        return logterm(I[0],C + ncov)
 
-        temp_cov = ncov + xi
-        temp_vec = mu - i
-        _,ldtemp = np.linalg.slogdet(temp_cov)
-        result += - ldF + (-l2p - ldtemp - dot([temp_vec,inv(temp_cov),temp_vec]))/2
+    fi = inv(F)
+    _,ldfi = np.linalg.slogdet(fi)
 
-        xi = dot([iF,X + Q,iF.transpose()])
-        mu = dot([iF,inv(X),dot([ncov,mu]) + dot([xi,i])])
-        
-    X = inv(inv(ncov) + inv(xi))
-    eta = dot([inv(X),dot([ncov,mu]) + dot([xi,I[0]])])
+    out = ldfi
 
-    temp_cov = ncov + xi
-    temp_vec = mu - I[0]
-    _,ldtemp = np.linalg.slogdet(temp_cov)
-    result += (-l2p - ldtemp - dot([temp_vec,inv(temp_cov),temp_vec]))/2
+    mu = dot([fi,I[-1]])
+    xi = dot([fi.transpose(),Q + ncov,fi])
 
-    temp_cov = C + X
-    temp_vec = eta
-    _,ldtemp = np.linalg.slogdet(temp_cov)
+    for n in reversed(range(len(I[:-1]))):
+        if method == 1:
+            mu,xi,contrib = iterate_1(mu,xi,I[n],C,Q,ncov,F,n)
+        elif method == 2:
+            mu,xi,contrib = iterate_2(mu,xi,I[n],C,Q,ncov,F,n)
+        elif method == 3:
+            mu,xi,contrib = iterate_3(mu,xi,I[n],C,Q,ncov,F,n)
+        else:
+            print("Method not recognized.")
+            exit()
+        out += contrib
 
-    result += (-l2p - ldtemp - dot([temp_vec,inv(temp_cov),temp_vec]))/2
-
-    out = result
-    
     if log:
-        return(out)
+        return out
     else:
         return np.exp(out)
+    
+def iterate_1(mu,xi,I,C,Q,ncov,F,n):
+
+    if n == 0:
+        F = 0*F
+        Q = C
+    
+    X = inv(inv(Q) + inv(ncov))
+
+    if n == 0:        
+        eta = dot([X,inv(ncov),I])
+        return 0,0,logterm(I,ncov + Q) + logterm(mu - eta,xi + X)
+
+    O = dot([X,inv(Q),F])
+    
+    A = dot([inv(F),ncov + Q,inv(F).transpose()])
+    B = dot([inv(O),xi + X,inv(O).transpose()])
+
+    m = dot([inv(F),I]) - dot([inv(O),mu - dot([X,inv(ncov),I])])
+    cov = A + B
+
+    distcon = logterm(m,cov)
+
+    _,fcon = np.linalg.slogdet(F)
+    _,ocon = np.linalg.slogdet(O)
+
+    contrib = - fcon - ocon + distcon
+
+    xio = inv(inv(A) + inv(B))
+    mtemp = dot([inv(A),inv(F),I]) + dot([inv(B),inv(O),(mu - dot([X,inv(ncov),I]))])
+    
+    muo = dot([xio,mtemp])
+
+    return muo,xio,contrib
+
+def iterate_2(mu,xi,I,C,Q,ncov,F,n):
+
+    if n == 0:
+        F = 0*F
+        Q = C
+
+    X = inv(inv(xi) + inv(ncov))
+    eta = dot([X,(dot([inv(xi),mu]) + dot([inv(ncov),I]))])
+
+    if n == 0:
+        return 0,0,logterm(mu - I, xi + ncov) + logterm(eta,X + Q)
+
+    _,fcon = np.linalg.slogdet(F)
+    
+    xio = dot([inv(F),X + Q, inv(F).transpose()])
+    muo = dot([inv(F),eta])
+
+    contrib = -fcon + logterm(mu - I,xi + ncov)
+                          
+    return muo,xio,contrib
+              
+              
+def iterate_3(mu,xi,I,C,Q,ncov,F,n):
+
+    '''
+    Double checked this all.
+    '''
+
+    if n == 0:
+        F = 0*F
+        Q = C
+
+    X = inv(inv(xi) + inv(Q))
+
+    if n == 0:
+        eta = dot([X,dot([inv(xi),mu])])
+        return 0,0,logterm(mu,Q + xi) + logterm(eta - I,X + ncov)
+
+    O = dot([X,inv(Q),F])
+    nu = (I - dot([X,inv(xi),mu]))
+
+    A = dot([inv(F),(Q + xi),inv(F).transpose()])
+    B = dot([inv(O),(X + ncov),inv(O).transpose()])
+
+    _,fcon = np.linalg.slogdet(F)
+    _,ocon = np.linalg.slogdet(O)
+
+    contrib = - fcon - ocon + logterm(dot([inv(F),mu]) - dot([inv(O),nu]),A + B)
+
+    xio = inv(inv(A) + inv(B))
+    mutemp = dot([inv(B),inv(O),nu]) + dot([inv(A),inv(F),mu])
+    muo = dot([xio,mutemp])
+
+    return muo,xio,contrib
 
 
 def inv(x):
     return np.linalg.inv(x)
-
-def get_new_mc_old(m,x,mu,cov,qcov,F):
-    tempcov = np.dot(np.dot(np.transpose(F),x+qcov),F)
-    xi = inv(inv(cov) + inv(tempcov))
-    em = np.dot(xi,np.dot(inv(cov),mu)+np.dot(inv(tempcov),np.dot(inv(F),m)))
-
-    return em,xi
-
-def get_new_mc(mu,xi,I,cov,qcov,ncov,iF):
-    tempcov = dot([iF,xi + qcov,iF.transpose()])
-    ixi = inv(ncov) + inv(tempcov)
-    xi = inv(ixi)
-    em = dot([ixi,(dot([ncov,iF,mu]) + dot([tempcov,I]))])
-
-    return em,xi
 
 def att_gnn(x,cov,qcov,F):
     lam = sum([LAM(x[:,0],cov)**2] + [LAM(x[:,i] - np.tensordot(x[:,i-1],F,axis = [1,1]),qcov)**2 for i in range(1,len(x[0]))])

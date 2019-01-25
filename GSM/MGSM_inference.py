@@ -95,38 +95,37 @@ def expectation_log(E,f,pnts,logsp = False,n_d_exp = 1):
     return out
 
 def find_f_max(f,low=0,high=np.inf,start=1,eps = 1e-5):
-
     dx = eps
     mid = start
+    new_mid = mid+dx
 
+    
     fi = f(mid)
-    fm = f(mid + dx)
+    fm = f(new_mid)
 
     step = 0
-    while np.abs(dx) > 1e-10 and step < 1000 and np.abs(mid - low) > 1e-7 and np.abs(mid-high)>1e-7:
+    while np.abs(dx) > 1e-10 and step < 1000 and np.abs(mid - low) > 1e-7 and np.abs(mid-high)>1e-7 and np.abs(fi - fm) > 1e-10:
 
         if fm < fi:
             dx *= -.5
         else:
             dx *=1.1
 
-
+        mid = new_mid
+            
         step+=1
 
         new_mid = mid + dx
 
         
         if new_mid <= low:
-            mid = (mid + low)/2
+            new_mid = (mid + low)/2
         elif new_mid >= high:
-            mid = (mid + high)/2
-        else:
-            mid = new_mid
+            new_mid = (mid + high)/2
             
         fi = f(mid)
-        fm = f(mid + dx)
-
-
+        fm = f(new_mid)
+        
     d2 = get_2nd_deriv(f,mid)
 
     return mid,f(mid),d2[0],d2[1],step

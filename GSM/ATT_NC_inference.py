@@ -12,7 +12,7 @@ def nc_att_egia(n,I,a,cov,ncov,qcov,ucov,F,G,getall = False,getP = False):
     
     QQ = scipy.linalg.block_diag(qcov,ucov)
     FF = scipy.linalg.block_diag(F,G)
-    H = np.concatenate([a*np.eye(len(cov)),np.zeros_like(ncov)],axis = 1)
+    H = np.concatenate([a*np.eye(len(cov)),np.eye(ncov.shape[0])],axis = 1)
     R = np.zeros([I.shape[-1],I.shape[-1]])
     
     for i in I:
@@ -21,7 +21,6 @@ def nc_att_egia(n,I,a,cov,ncov,qcov,ucov,F,G,getall = False,getP = False):
         pout.append(p)
         p = dot([FF,p,FF.transpose()]) + QQ
         g = dot([FF,g])
-
         
     if getP:
         return np.array(out),np.array(pout)
@@ -49,7 +48,10 @@ def get_new_mc_cornoise(xt,mt,i,A,B,iSIGMA,nu,GmFi):
 
     return xio,muo    
 
-def nc_att_PIA_iter(I,a,cov,ncov,qcov,ucov,F,G):
+def nc_att_PIA_iter(I,a,cov,ncov,qcov,ucov,F,G,log = True):
+
+    T = I.shape[0]
+    D = I.shape[1]
 
     C = a*a*cov
     Q = a*a*qcov
@@ -65,7 +67,7 @@ def nc_att_PIA_iter(I,a,cov,ncov,qcov,ucov,F,G):
     xt = dot([inv(F-G),ucov + Q,inv(F-G).transpose()])
     mt = dot([inv(F-G),ImI[-1]])
 
-    _,ldfi = np.linalg.slogdet(inv(F))
+    _,ldfi = np.linalg.slogdet(inv(F-G))
 
     result = ldfi# * 2 #I think this is just suppposed to be a single det[F-G]
 
@@ -88,6 +90,8 @@ def nc_att_PIA_iter(I,a,cov,ncov,qcov,ucov,F,G):
         xt,mt = get_new_mc_cornoise(xt,mt,i,A,B,iSIGMA,nu,GmFi)
         '''
 
+    if log == False:
+        return np.exp(result)
     return result
 
 def logterm(m,C,logdet = None):
@@ -122,7 +126,7 @@ def iterate_1(mu,xi,I,C,Q,ncov,U,F,G,n):
 
     distcon = logterm(m,cov)
 
-    _,fcon = np.linalg.slogdet(F)
+    _,fcon = np.linalg.slogdet(F - G)
     _,ocon = np.linalg.slogdet(O)
 
     contrib = - fcon - ocon + distcon
@@ -178,25 +182,25 @@ def general_nc_att_gexp(x,cov,ncov,qcov,ucov,F,G,ind):
 
     return np.array(OUT)
 
-def general_nc_att_pexp(x,cov,ncov,qcov,F,ind):
+def general_nc_att_pexp(x,cov,ncov,qcov,ucov,F,G,ind):
     
-    TOP = [np.array([INT(lambda a: nc_att_P_integrand(j,x[k],a,cov,ncov,qcov,F),0,np.inf)[0] for j in ind]) for k in range(len(x))]
+    TOP = [np.array([INT(lambda a: nc_att_P_integrand(j,x[k],a,cov,ncov,qcov,ucov,F,G),0,np.inf)[0] for j in ind]) for k in range(len(x))]
     
-    NORM = [INT(lambda a: nc_att_norm(x[k],a,cov,ncov,qcov,F),0,np.inf)[0] for k in range(len(x))]
+    NORM = [INT(lambda a: nc_att_norm(x[k],a,cov,ncov,qcov,ucov,F,G),0,np.inf)[0] for k in range(len(x))]
     
     OUT = [TOP[k]/NORM[k] if NORM[k] != 0 else np.zeros_like(TOP[k]) for k in range(len(TOP))]
 
     return np.array(OUT)
 
-def nc_att_gexp_full(x,cov,ncov,qcov,F):
-    return general_nc_att_gexp(x,cov,ncov,qcov,F,range(x.shape[2]))
+def nc_att_gexp_full(x,cov,ncov,qcov,ucov,F,G):
+    return general_nc_att_gexp(x,cov,ncov,qcov,ucov,F,G,range(x.shape[2]))
 
-def nc_att_pexp_full(x,cov,ncov,qcov,F):
-    return general_nc_att_pexp(x,cov,ncov,qcov,F,range(x.shape[2]))
+def nc_att_pexp_full(x,cov,ncov,qcov,ucov,F,G):
+    return general_nc_att_pexp(x,cov,ncov,qcov,ucov,F,G,range(x.shape[2]))
 
-def get_MGSM_nc_att_weights(F,segs,C,NC,QC,FC,P):
+def get_MGSM_nc_att_weights(F,segs,C,NC,QC,UC,FC,GC,P):
     #(I,cov,ncov,qcov,F)
-    gsm_resp = np.array([np.log(P[k]) + np.sum([np.log(nc_att_PShared(F[:,:,segs[k][j]],C[k][j],NC[k][j],QC[k][j],FC[k][j])) for j in range(len(segs[k]))],axis = 0) for k in range(len(segs))]) # shape [nseg,ndata]
+    gsm_resp = np.array([np.log(P[k]) + np.sum([np.log(nc_att_PShared(F[:,:,segs[k][j]],C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j])) for j in range(len(segs[k]))],axis = 0) for k in range(len(segs))]) # shape [nseg,ndata]
 
     b = np.amax(gsm_resp,axis = 0,keepdims = True)
     
@@ -210,25 +214,29 @@ def get_MGSM_nc_att_weights(F,segs,C,NC,QC,FC,P):
     return out
 
 
-def find_GSM_nc_pia_max(I,C,NC,QC,FC,low,high,start,eps):
-    out = find_f_max(lambda a:Pa(a,log = True) + nc_att_PIA_iter(I,a,C,NC,QC,FC,log = True),low=low,high=high,start=start,eps = eps)
+def find_GSM_nc_pia_max(I,C,NC,QC,UC,FC,GC,low,high,start,eps):
+    out = find_f_max(lambda a:Pa(a,log = True) + nc_att_PIA_iter(I,a,C,NC,QC,UC,FC,GC,log = True),low=low,high=high,start=start,eps = eps)
     return out
+
+def get_max_PIA(F,segs,C,NC,QC,UC,FC,GC,P):
+    PIA_max = np.array([[[find_GSM_nc_pia_max(F[i][:,segs[k][j]],C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j],low=0,high=np.inf,start=10.,eps = 1.)[0] for i in range(F.shape[0])] for j in range(len(segs[k]))] for k in range(len(segs))]) # shape [nseg,ndata]
+    return PIA_max
     
-def stable_get_MGSM_nc_att_weights(F,segs,C,NC,QC,FC,P,ind,rev_ind,ifrac = 100,npnt = 1000,op = True,calc_p = False):
+def stable_get_MGSM_nc_att_weights(F,segs,C,NC,QC,UC,FC,GC,P,ind,rev_ind,ifrac = 100,npnt = 1000,op = True,calc_p = False):
     #(I,cov,ncov,qcov,F)
 
     if op == True:
-        PIA_max = np.array([[[find_GSM_nc_pia_max(F[i][:,segs[k][j]],C[k][j],NC[k][j],QC[k][j],FC[k][j],low=0,high=np.inf,start=10.,eps = 1.) for i in range(F.shape[0])] for j in range(len(segs[k]))] for k in range(len(segs))]) # shape [nseg,ndata]
+        PIA_max = np.array([[[find_GSM_nc_pia_max(F[i][:,segs[k][j]],C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j],low=0,high=np.inf,start=10.,eps = 1.) for i in range(F.shape[0])] for j in range(len(segs[k]))] for k in range(len(segs))]) # shape [nseg,ndata]
         
-        logints = np.array([[[logint.integrate_log(lambda a:Pa(a,log = True) + nc_att_PIA_iter(F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],FC[k][j],log = True),PIA_max[k][j][i][0]/ifrac,ifrac*PIA_max[k][j][i][0],[PIA_max[k][j][i][0]]) for i in range(len(PIA_max[k][j]))] for j in range(len(PIA_max[k]))] for k in range(len(PIA_max))])
+        logints = np.array([[[logint.integrate_log(lambda a:Pa(a,log = True) + nc_att_PIA_iter(F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j],log = True),PIA_max[k][j][i][0]/ifrac,max(ifrac*PIA_max[k][j][i][0],100),[PIA_max[k][j][i][0]]) for i in range(len(PIA_max[k][j]))] for j in range(len(PIA_max[k]))] for k in range(len(PIA_max))])
     else:
-        logints = np.array([[[logint.integrate_log(lambda a:Pa(a,log = True) + nc_att_PIA_iter(F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],FC[k][j],log = True),.0001,5000,[]) for i in range(F.shape[0])] for j in range(len(segs[k]))] for k in range(len(segs))])
+        logints = np.array([[[logint.integrate_log(lambda a:Pa(a,log = True) + nc_att_PIA_iter(F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j],log = True),.0001,5000,[]) for i in range(F.shape[0])] for j in range(len(segs[k]))] for k in range(len(segs))])
         
     if calc_p:
-        GNlogints = np.array([np.concatenate([np.array([expectation_log(lambda a:nc_att_egia(ind[k][j],F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],FC[k][j],getP = True)[1][-1],lambda a: Pa(a,log = True) + nc_att_PIA_iter(F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],FC[k][j],log = True),logints[k][j][i][1]["points"],n_d_exp = 2) if len(ind[k][j])>0 else [] for i in range(F.shape[0])]) for j in range(len(segs[k]))],axis = 1) for k in range(len(segs))])
+        GNlogints = np.array([np.concatenate([np.array([expectation_log(lambda a:nc_att_egia(ind[k][j],F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j],getP = True)[1][-1],lambda a: Pa(a,log = True) + nc_att_PIA_iter(F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j],log = True),logints[k][j][i][1]["points"],n_d_exp = 2) if len(ind[k][j])>0 else [] for i in range(F.shape[0])]) for j in range(len(segs[k]))],axis = 1) for k in range(len(segs))])
         
     else:
-        GNlogints = np.array([np.concatenate([np.array([expectation_log(lambda a:nc_att_egia(ind[k][j],F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],FC[k][j]),lambda a: Pa(a,log = True) + nc_att_PIA_iter(F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],FC[k][j],log = True),logints[k][j][i][1]["points"]) if len(ind[k][j])>0 else [] for i in range(F.shape[0])]) for j in range(len(segs[k]))],axis = 1)[:,rev_ind[k]] for k in range(len(segs))])
+        GNlogints = np.array([np.concatenate([np.array([expectation_log(lambda a:nc_att_egia(ind[k][j],F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j]),lambda a: Pa(a,log = True) + nc_att_PIA_iter(F[i][:,segs[k][j]],a,C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j],log = True),logints[k][j][i][1]["points"]) if len(ind[k][j])>0 else [] for i in range(F.shape[0])]) for j in range(len(segs[k]))],axis = 1)[:,rev_ind[k]] for k in range(len(segs))])
     
     mgsm_resp = np.array([np.log(P[k]) + np.array([np.sum([logints[k][j][i][0] for j in range(len(segs[k]))]) for i in range(F.shape[0])]) for k in range(len(segs))]) # shape [nseg,ndata]
 
@@ -244,7 +252,7 @@ def stable_get_MGSM_nc_att_weights(F,segs,C,NC,QC,FC,P,ind,rev_ind,ifrac = 100,n
 
     return out,GNlogints
 
-def general_MGSM_g_nc_att(F,segs,C,NC,QC,FC,P,ind,ifrac = 1.5,npnt = 1000,stable = True,op=True):
+def general_MGSM_g_nc_att(F,segs,C,NC,QC,UC,FC,GC,P,ind,ifrac = 1.5,npnt = 1000,stable = True,op=True):
 
     '''
     Description:performs MGSM inference on a general MGSM model with attention and noise.
@@ -265,9 +273,9 @@ def general_MGSM_g_nc_att(F,segs,C,NC,QC,FC,P,ind,ifrac = 1.5,npnt = 1000,stable
     seg_to_ind = [reverse_indices(np.concatenate([np.array(segs[s][k])[seg_index[s][k]] for k in range(len(seg_index[s]))]),ind) for s in range(len(seg_index))]
 
     if stable:
-        probs,gsm_resp = stable_get_MGSM_nc_att_weights(F,segs,C,NC,QC,FC,P,seg_index,seg_to_ind,ifrac=ifrac,npnt=npnt,op=op,calc_p=False)#[nseg,ndata]
+        probs,gsm_resp = stable_get_MGSM_nc_att_weights(F,segs,C,NC,QC,UC,FC,GC,P,seg_index,seg_to_ind,ifrac=ifrac,npnt=npnt,op=op,calc_p=False)#[nseg,ndata]
     else:
-        probs = np.transpose(get_MGSM_nc_att_weights(F,segs,C,NC,QC,FC,P))#[nseg,ndata]
+        probs = np.transpose(get_MGSM_nc_att_weights(F,segs,C,NC,QC,UC,FC,GC,P))#[nseg,ndata]
 
     if np.any(np.isnan(probs)):
         print("probs")
@@ -275,7 +283,7 @@ def general_MGSM_g_nc_att(F,segs,C,NC,QC,FC,P,ind,ifrac = 1.5,npnt = 1000,stable
         
     #att_gexp(n,x,cov,ncov,qcov,F)
     if stable == False:
-        gsm_resp = np.array([np.concatenate([general_nc_att_gexp(F[:,:,segs[k][j]],C[k][j],NC[k][j],QC[k][j],FC[k][j],seg_index[k][j]) for j in range(len(segs[k]))],axis = 1)[:,seg_to_ind[k]] for k in range(len(segs))]) # shape [nseg,ndata,nfilt]
+        gsm_resp = np.array([np.concatenate([general_nc_att_gexp(F[:,:,segs[k][j]],C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j],seg_index[k][j]) for j in range(len(segs[k]))],axis = 1)[:,seg_to_ind[k]] for k in range(len(segs))]) # shape [nseg,ndata,nfilt]
 
     if np.any(np.isnan(gsm_resp)) or np.any(np.isinf(gsm_resp)):
         print("gsm_resp")
@@ -286,7 +294,7 @@ def general_MGSM_g_nc_att(F,segs,C,NC,QC,FC,P,ind,ifrac = 1.5,npnt = 1000,stable
 
     return result
 
-def general_MGSM_p_nc_att(F,segs,C,NC,QC,FC,P,ind,ifrac = 1.5,npnt = 1000,stable = True,op=True):
+def general_MGSM_p_nc_att(F,segs,C,NC,QC,UC,FC,GC,P,ind,ifrac = 1.5,npnt = 1000,stable = True,op=True):
 
     '''
     Description:performs MGSM inference on a general MGSM model with attention and noise.
@@ -307,9 +315,9 @@ def general_MGSM_p_nc_att(F,segs,C,NC,QC,FC,P,ind,ifrac = 1.5,npnt = 1000,stable
     seg_to_ind = [reverse_indices(np.concatenate([np.array(segs[s][k])[seg_index[s][k]] for k in range(len(seg_index[s]))]),ind) for s in range(len(seg_index))]
 
     if stable:
-        probs,gsm_resp = stable_get_MGSM_nc_att_weights(F,segs,C,NC,QC,FC,P,seg_index,seg_to_ind,ifrac=ifrac,npnt=npnt,op=op,calc_p = True)#[nseg,ndata]
+        probs,gsm_resp = stable_get_MGSM_nc_att_weights(F,segs,C,NC,QC,UC,FC,GC,P,seg_index,seg_to_ind,ifrac=ifrac,npnt=npnt,op=op,calc_p = True)#[nseg,ndata]
     else:
-        probs = np.transpose(get_MGSM_nc_att_weights(F,segs,C,NC,QC,FC,P))#[nseg,ndata]
+        probs = np.transpose(get_MGSM_nc_att_weights(F,segs,C,NC,QC,UC,FC,GC,P))#[nseg,ndata]
 
     if np.any(np.isnan(probs)):
         print("probs")
@@ -317,7 +325,7 @@ def general_MGSM_p_nc_att(F,segs,C,NC,QC,FC,P,ind,ifrac = 1.5,npnt = 1000,stable
         
     #att_gexp(n,x,cov,ncov,qcov,F)
     if stable == False:
-        gsm_resp = np.array([np.concatenate([general_nc_att_pexp(F[:,:,segs[k][j]],C[k][j],NC[k][j],QC[k][j],FC[k][j],seg_index[k][j]) for j in range(len(segs[k]))],axis = 1)[:,seg_to_ind[k]] for k in range(len(segs))]) # shape [nseg,ndata,nfilt]
+        gsm_resp = np.array([np.concatenate([general_nc_att_pexp(F[:,:,segs[k][j]],C[k][j],NC[k][j],QC[k][j],UC[k][j],FC[k][j],GC[k][j],seg_index[k][j]) for j in range(len(segs[k]))],axis = 1)[:,seg_to_ind[k]] for k in range(len(segs))]) # shape [nseg,ndata,nfilt]
 
     if np.any(np.isnan(gsm_resp)) or np.any(np.isinf(gsm_resp)):
         print("gsm_resp")
@@ -344,7 +352,7 @@ def CC_MGSM_nc_att_g(F1,F2,CC,CCS,CS,NCC,NCCS,NCS,QCC,QCCS,QCS,FCC,FCCS,FCS,P):
 
     return np.transpose((np.reshape(probs,(len(P),1,-1))*gv).sum(axis = 0),(1,0))
     
-def nc_att_PShared_nonoise(d,segs,C,QC,FF,P,fq_shared = False,f_ID = False):
+def nc_att_PShared_nonoise(d,segs,C,QC,UC,FC,GC,P,fq_shared = False,f_ID = False):
 
     '''
     Description: given filters and covariances computes P[x|cov,shared]
@@ -358,7 +366,7 @@ def nc_att_PShared_nonoise(d,segs,C,QC,FF,P,fq_shared = False,f_ID = False):
     else:
         FC = FF
         
-    ll = np.array([np.sum(np.array([nc_att_LogLikelihood(d[:,:,segs[s][c]],C[s][c],QC[s][c],FC[s][c],mean = False,fq_shared = fq_shared) for c in range(len(segs[s]))]),axis = 0) + np.log(P[s]) for s in range(len(segs))])
+    ll = np.array([np.sum(np.array([nc_att_LogLikelihood(d[:,:,segs[s][c]],C[s][c],QC[s][c],UC[k][j],FC[s][c],GC[k][j],mean = False,fq_shared = fq_shared) for c in range(len(segs[s]))]),axis = 0) + np.log(P[s]) for s in range(len(segs))])
     
     #ll -> [len(segs),ndat]
 
@@ -366,7 +374,7 @@ def nc_att_PShared_nonoise(d,segs,C,QC,FF,P,fq_shared = False,f_ID = False):
     
     return np.transpose(np.exp(ll-b)/np.sum(np.exp(ll-b),axis = 0,keepdims = True))
     
-def nc_att_MGSM_loglik(d,segs,C,QC,F,P,fq_shared = False,f_ID = False):
+def nc_att_MGSM_loglik(d,segs,C,QC,UC,F,G,P,fq_shared = False,f_ID = False):
 
     '''
     Description: given filters and covariances computes P[x|cov,shared]
@@ -380,7 +388,7 @@ def nc_att_MGSM_loglik(d,segs,C,QC,F,P,fq_shared = False,f_ID = False):
     else:
         FC = F
         
-    ll = np.array([np.sum(np.array([nc_att_LogLikelihood(d[:,:,segs[s][c]],C[s][c],QC[s][c],FC[s][c],mean = False,fq_shared = fq_shared) for c in range(len(segs[s]))]),axis = 0) + np.log(P[s]) for s in range(len(segs))])
+    ll = np.array([np.sum(np.array([nc_att_LogLikelihood(d[:,:,segs[s][c]],C[s][c],QC[s][c],GC[s][c],FC[s][c],GC[s][c],mean = False,fq_shared = fq_shared) for c in range(len(segs[s]))]),axis = 0) + np.log(P[s]) for s in range(len(segs))])
 
     lm = np.max(ll,axis = 0,keepdims = True)
 
@@ -704,37 +712,67 @@ if __name__ == "__main__":
     def mat_sq(m):
         return np.dot(m,m.transpose())
     
-    I = np.random.randn(2,1,10)
-    I = np.ones([2,5,10])
+    I = np.random.randn(200,10)
+    I = np.ones([100,10])
     
-    a = 2.
-    cov = mat_sq(np.random.randn(10,10))
-    ncov = mat_sq(np.random.randn(10,10))
+    a = np.random.uniform(1,10)
+    cov = 2*np.eye(10)#mat_sq(np.random.randn(10,10))
+    ncov = 2*np.eye(10)#mat_sq(np.random.randn(10,10))
 
-    F = .9*np.eye(10)
-    G = 0*np.eye(10)
-
+    def make_offd(a,b,c,N):
+        return a*np.eye(N) + b*np.diag(np.ones(N-1),1) + c*np.diag(np.ones(N-1),-1)
+    
+    F = .99*np.eye(10)
+    G = .1*np.eye(10)#make_offd(.2,.1,.3,10)
+    
     qcov = Q_self_con(cov,F)#mat_sq(np.random.randn(10,10))
     ucov = Q_self_con(ncov,G)#)ncov#.1*mat_sq(np.random.randn(10,10))
 
+    print("Stationarity: {}".format(np.sum((dot([F.T,cov,F]) + qcov - cov)**2)))
+
+    print(np.linalg.norm(F))
+    print(np.linalg.norm(G))
     print("noise cov:",np.sum((ucov - ncov)**2))
 
     n = 0
     
-    print("Testing")
-    
-    g1 = nc_att_egia(n,I[0],a,cov,ncov,qcov,ucov,F,G,getall = True)
-    g2 = att.att_egia(n,I[0],a,cov,ncov,qcov,F,getall = True)
-    
-    print(((g1[:,:10] - g2)**2).sum())
-    #exit()
-    
     print("Testing PIA")
-    
-    p1 = nc_att_PIA_iter(I[0],a,cov,ncov,qcov,ucov,F,G)#(I[0],a,cov,ncov,qcov,ucov,F,G)
-    p2 = PIA_test.PIA(1,I[0],a,cov,ncov,qcov,F)
-    print(p1)
-    print(p2)
-    exit()
 
+    t1 = time.time()
+
+    p1 = nc_att_PIA_iter(I,a,cov,ncov,qcov,ucov,F,G)#(I[0],a,cov,ncov,qcov,ucov,F,G)
+    print(F.sum())
+    t2 = time.time()
+
+    p2 = PIA_test.big_PIA_comp(I,a,cov,ncov,F,G)
+    print(F.sum())
+    
+    t3 = time.time()
+
+    p3 = PIA_test.att_PIA_iter(2,I,a,cov,ncov,qcov,F)
+    print(F.sum())
+    
+    t4 = time.time()
+    print("{}\t{}".format(t2-t1,p1))
+    print("{}\t{}".format(t3-t2,p2))
+    print("NOCOR: {}\t{}".format(t4-t2,p3))
+
+    segs = [[range(10)]]
+    ind = [0]
+    P = [1]
+    
+    I = 20*np.ones([1,30,10])
+    
+    t1 = time.time()
+    res = general_MGSM_g_nc_att(I,segs,[[cov]],[[ncov]],[[qcov]],[[ucov]],[[F]],[[G]],P,ind)
+    t2 = time.time()
+    
+    print(t2 - t1,res[0])
+
+    t1 = time.time()
+    res = att.general_MGSM_g_att(I,segs,[[cov]],[[ncov]],[[qcov]],[[F]],P,ind)
+    t2 = time.time()
+    
+    print(t2 - t1,res[0])
+    exit()
    

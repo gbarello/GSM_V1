@@ -17,7 +17,7 @@ def logterm(m,C,logdet = None):
         
     return -(len(m) * np.log(2*np.pi) + logdet + dot([m,inv(C),m]))/2
 
-def PIA(method,I,a,cov,ncov,qcov,F):
+def att_PIA_iter(method,I,a,cov,ncov,qcov,F):
 
     C = a*a*cov
     Q = a*a*qcov
@@ -38,16 +38,18 @@ def PIA(method,I,a,cov,ncov,qcov,F):
     mu = dot([fi,I[-1]])
     xi = dot([fi.transpose(),Q + ncov,fi])
 
+    if method == 1:
+        iterator = iterate_1
+    elif method == 2:
+        iterator = iterate_2
+    elif method == 3:
+        iterator = iterate_3
+    else:
+        print("Method not recognized")
+        exit()
+        
     for n in reversed(range(len(I[:-1]))):
-        if method == 1:
-            mu,xi,contrib = iterate_1(mu,xi,I[n],C,Q,ncov,F,n)
-        elif method == 2:
-            mu,xi,contrib = iterate_2(mu,xi,I[n],C,Q,ncov,F,n)
-        elif method == 3:
-            mu,xi,contrib = iterate_3(mu,xi,I[n],C,Q,ncov,F,n)
-        else:
-            print("Method not recognized.")
-            exit()
+        mu,xi,contrib = iterator(mu,xi,I[n],C,Q,ncov,F,n)
         out += contrib
 
     return out
@@ -141,6 +143,31 @@ def iterate_3(mu,xi,I,C,Q,ncov,F,n):
 
     return muo,xio,contrib
 
+def big_PIA_comp(I,a,cov,ncov,F,G):
+    def C(n,m):
+        gchol = np.linalg.cholesky(a*a*cov)
+        nchol = np.linalg.cholesky(ncov)
+        
+        A = dot([gchol,np.linalg.matrix_power(F,abs(m-n)),gchol.conj().T])#,a*a*cov)
+        B = dot([nchol,np.linalg.matrix_power(G,abs(m-n)),nchol.conj().T])#,ncov)
+
+        if m >= n:
+            return A+B
+        else:
+            return (A+B).transpose()
+
+    CI = np.array([[C(i,j) for j in range(len(I))] for i in range(len(I))]).transpose([0,2,1,3])
+
+    size = len(I) * len(cov)
+    
+    CI = np.reshape(CI,[size,size])
+
+    i = np.reshape(I,[-1])
+
+    print("CISUM: {}".format(np.sum(CI - CI.transpose())))
+    
+    return logterm(i,CI)
+    
 if __name__ == "__main__":
     from GSM.ATT_GSM_inference import Q_self_con
     np.random.seed(0)
@@ -148,7 +175,7 @@ if __name__ == "__main__":
     def mat_sq(m):
         return np.dot(m,m.transpose())
     
-    I = np.ones([100,10])
+    I = np.random.randn(100,10)#np.ones([100,10])
     
     a = 2.
     cov = mat_sq(np.random.randn(10,10))
@@ -160,5 +187,7 @@ if __name__ == "__main__":
     print("Testing PIA")
 
     for m in [1,2,3]:
-        p1 = PIA(m,I,a,cov,ncov,qcov,F)
+        p1 = att_PIA_iter(m,I,a,cov,ncov,qcov,F)
         print(p1)
+
+    print(big_PIA_comp(I,a,cov,ncov,F,0*F))

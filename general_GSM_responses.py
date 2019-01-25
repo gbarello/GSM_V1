@@ -8,6 +8,8 @@ parser.add_argument("dir",type = str,help = "Directory of the model to run.")
 parser.add_argument("type",type = str,help = "type of stimuli to run",default = "size_tuning")
 parser.add_argument("--n_frame",type = int,default = 2,help = "number of time points to use in inference.")
 parser.add_argument("--snr",type = float,default = 1.,help = "SNR of the noisy model.")
+parser.add_argument("--noise_tau",type = float,default = 0,help = "timescale of noise correlations.")
+parser.add_argument("--signal_tau",type = float,default = 0,help = "timescale of signal correlations.")
 parser.add_argument("--dt",type = float,default = 1.,help = "dt to run at, relative to the fit dt.")
 parser.add_argument("--con",type = float,default = .5,help = "contrast for the stimulus.")
 parser.add_argument("--npnt",type = int,default = 10,help = "Number of stimuli sampling points to use.")
@@ -16,6 +18,7 @@ parser.add_argument("--time",type = int,default = -1,help = "If nonzero, run for
 parser.add_argument("--pad",type = int,default = 0,help = "Pad stim with {pad} zeros.")
 parser.add_argument("--fexp",action = 'store_true',default = False,help = "Use the proper rescaling of F based on matrix logs and exponents.")
 parser.add_argument("--variance",action = 'store_true',default = False,help = "Flag to calculate the uncertainty, P instead of the mean response.")
+parser.add_argument("--amax",action = 'store_true',default = False,help = "Flag to calculate the MAP value of a.")
 parser.add_argument("--tag",default = "",help = "A prefix to add to the output.")
 
 args = vars(parser.parse_args())
@@ -26,12 +29,21 @@ import model_tools
 import image_processing.stimuli as stim
 import image_processing.make_dataset as make_data
 import GSM.ATT_GSM_inference as inference
+import GSM.ATT_NC_inference as NC_inference
 
 if args["variance"]:
-    respF = inference.general_MGSM_p_att
+    if args["noise_tau"] > 0:
+        respF = NC_inference.general_MGSM_p_nc_att
+        args["tag"] += "tcornoise_{}_".format(args["noise_tau"])
+    else:
+        respF = inference.general_MGSM_p_att
     args["tag"] += "variance_"
 else:
-    respF = inference.general_MGSM_g_att
+    if args["noise_tau"] > 0:
+        respF = NC_inference.general_MGSM_g_nc_att
+        args["tag"] += "tcornoise_{}_".format(args["noise_tau"])
+    else:
+        respF = inference.general_MGSM_g_att
 
 direc = args["dir"]
 
@@ -40,6 +52,7 @@ data = model_tools.get_model_data(direc)
 for p in data["params"].keys():
     print("{}\t{}".format(p,data["params"][p]))
 pars = data["params"]
+
 
 def get_cross(M,ind):
     return np.array([[M[i,j] for j in ind] for i in ind])
@@ -132,9 +145,18 @@ print(np.array(rundat).shape)
 
 import scipy.linalg as linalg
 
-feps = [[linalg.logm(m)/data["params"]["walk_dt"] for m in f] for f in data["F"]]
-FF = [[np.float32(linalg.expm(args["dt"] * data["params"]["walk_dt"] * m)) for m in f] for f in feps]
-    
+if args["signal_tau"] > 0:
+    args["tag"] += "signal_tau_{}".format(args["signal_tau"])
+    FF = [[np.eye(len(f2))*np.exp(-args["dt"]/args["signal_tau"]) for f2 in f1] for f1 in data["F"]]
+else:
+    feps = [[linalg.logm(m)/data["params"]["walk_dt"] for m in f] for f in data["F"]]
+    FF = [[np.float32(linalg.expm(args["dt"] * m)) for m in f] for f in feps]
+
+for f1 in range(len(FF)):
+    for f2 in range(len(FF[f1])):
+        print("FF mean value: {}".format(np.diag(FF[f1][f2]).mean()))
+        print("FD mean value: {}".format(np.diag(data["F"][f1][f2]).mean()))
+        
 #print(FF[0][0])
 QQ = [[inference.Q_self_con(data["C"][k][m],FF[k][m]) for m in range(len(data["F"][k]))] for k in range(len(data["F"]))]
 #QQ = [[args["dt"]*m for m in f] for f in data["Q"]]
@@ -172,21 +194,42 @@ else:
     kerprod *= 1./(args["snr"]**2)
     kerprod += np.eye(len(kerprod))*.001
 
+if args["noise_tau"] > 0:
+    GG = [[np.eye(len(f2))*np.exp(-args["dt"]/args["noise_tau"]) for f2 in f1] for f1 in FF]
+    UU = [[inference.Q_self_con(NC[k][m],GG[k][m]) for m in range(len(data["F"][k]))] for k in range(len(data["F"]))]
+    for f1 in range(len(GG)):
+        for f2 in range(len(GG[f1])):
+            print("GG mean value: {}".format(np.diag(GG[f1][f2]).mean()))
+    
 t1 = time.time()
 
 pad = np.zeros([rundat.shape[0],rundat.shape[1],args["pad"],rundat.shape[-1]])
 rundat = np.concatenate([pad,rundat],axis = 2)
 
+if args["amax"]:
+    args["tag"] += "amax_"
+    print("lets go!")
+    out = [NC_inference.get_max_PIA(np.array(cc),data["segs"],data["C"],NC,QQ,UU,FF,GG,data["P"]) for cc in rundat]
+    utils.dump_file(direc + "/"+args["tag"]+"responses_{}_{}_{}_{}_{}.pkl".format(args["con"],args["n_frame"],args["snr"],args["type"],args["dt"]),out)
+    exit()
+
 if args["TA"]==0:
     if args["time"]==-1:
-        responses = [respF(np.array(cc),data["segs"],data["C"],NC,QQ,FF,data["P"],ind,stable = True,op=True) for cc in rundat]
+        if args["noise_tau"] > 0:
+            responses = [respF(np.array(cc),data["segs"],data["C"],NC,QQ,UU,FF,GG,data["P"],ind,stable = True,op=True) for cc in rundat]
+        else:
+            responses = [respF(np.array(cc),data["segs"],data["C"],NC,QQ,FF,data["P"],ind,stable = True,op=True) for cc in rundat]
         
     else:
         print("time")
         responses = []
         for t in range(1,args["time"]):
             print(t)
-            responses.append([respF(np.array(cc)[:,:t],data["segs"],data["C"],NC,QQ,FF,data["P"],ind,stable = True,op=True) for cc in rundat])
+            if args["noise_tau"] > 0:
+                responses.append([respF(np.array(cc)[:,:t],data["segs"],data["C"],NC,QQ,UU,FF,GG,data["P"],ind,stable = True,op=True) for cc in rundat])
+            else:
+                responses.append([respF(np.array(cc)[:,:t],data["segs"],data["C"],NC,QQ,FF,data["P"],ind,stable = True,op=True) for cc in rundat])
+        
 else:
     
     if data["params"]["segmentation"]!= "gsm" and False:        
@@ -199,7 +242,10 @@ else:
 
         noise = np.random.multivariate_normal(np.zeros(len(kerprod)),kerprod,np.array(rundat).shape[1:-1])
 
-        responses.append([respF(np.array(cc) + noise,data["segs"],data["C"],NC,QQ,FF,data["P"],ind,stable = True,op=True) for cc in rundat])
+        if args["noise_tau"] > 0:
+            responses.append([respF(np.array(cc) + noise,data["segs"],data["C"],NC,QQ,UU,FF,GG,data["P"],ind,stable = True,op=True) for cc in rundat])
+        else:
+            responses.append([respF(np.array(cc) + noise,data["segs"],data["C"],NC,QQ,FF,data["P"],ind,stable = True,op=True) for cc in rundat])
     
 t2 = time.time()
 
