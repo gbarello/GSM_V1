@@ -54,7 +54,7 @@ def cov(n,w,dr = 0):
 def cov_special(n,w,dr = 0):
 
     if w == 0:
-        return np.identity(n)
+v        return np.identity(n)
     elif w == -1:
         return np.ones([n,n])
     else:
