@@ -8,7 +8,6 @@ import scipy.optimize
 import scipy.linalg 
 import theano.tensor as T
 import theano
-import matplotlib.pyplot as plt
 
 def mpbesselk(v,x):
     return scipy.special.kv(v,np.clip(x,0,700))#= np.frompyfunc(mp.besselk,2,1)
