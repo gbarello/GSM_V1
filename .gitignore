@@ -1,3 +1,4 @@
+*.json
 extra_ipynb
 responses_run.pkl
 noise_cor_data

@@ -211,7 +211,7 @@ else:
         NC = [[get_cross(kerprod,b) for b in a] for a in data["segs"]]
 
     kerprod *= 1./(args["snr"]**2)
-    kerprod += np.eye(len(kerprod))*.001
+    NC = [[get_cross(kerprod,b) for b in a] for a in data["segs"]]
 
 if args["noise_tau"] > 0:
     GG = [[np.eye(len(f2))*np.exp(-args["dt"]/args["noise_tau"]) for f2 in f1] for f1 in FF]
