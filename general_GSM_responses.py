@@ -24,6 +24,8 @@ parser.add_argument("--tag",default = "",help = "A prefix to add to the output."
 
 args = vars(parser.parse_args())
 
+print("Stimulus type: {}".format(args["type"]))
+
 import numpy as np
 import utilities as utils
 import model_tools
@@ -80,7 +82,7 @@ minwav = np.min(pars["wavelengths"])
 
 if args["type"] == "size_tuning":
     grats = [[stim.make_grating(c,0,k,int(s),fullsize) for s in np.linspace(0,int(fullsize/2),args["npnt"]) for c in np.linspace(0,1,11)] for k in pars["wavelengths"]]
-if args["type"] == "single_FF":
+elif args["type"] == "single_FF":
     grats = [[stim.make_grating(args["con"],0,k,int(2*fullsize),fullsize)] for k in pars["wavelengths"]]
 elif args["type"] == "ori_tuning":
     grats = [[stim.make_grating(args["con"],o,k,fullsize/2,fullsize) for o in np.linspace(0,np.pi,args["npnt"])] for k in pars["wavelengths"]]
@@ -135,7 +137,7 @@ elif args["type"] == "nat_MI":
 
     exit()
 else:
-    print("Stimuli not recognized")
+    print("Stimuli not recognized: {}".format(args["type"]))
     exit()
     
 print("Getting Coefficients")
