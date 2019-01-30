@@ -19,9 +19,10 @@ def get_mean_NC(C,segs):
     for a in range(len(COUNT)):
         for b in range(len(COUNT[a])):
             if COUNT[a][b] == 0:
-                COUNT[a][b] += 1
+                COUNT[a][b] = 1
            
-    out = NC/COUNT
+    out = NC/len(segs)
+    assert np.all(out == out.transpose())
     return out
 
 def get_kernel_NC(kernels,fpos,fac):
