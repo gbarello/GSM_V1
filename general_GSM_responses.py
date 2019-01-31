@@ -94,7 +94,10 @@ elif args["type"] == "WTA":
 elif args["type"] == "CRF_90":
     grats = [[stim.make_grating(o,np.pi/2,k,fullsize/2,fullsize) for o in np.linspace(.1,1,args["npnt"])] for k in pars["wavelengths"]]
 elif args["type"] == "COS":
-    grats = [[stim.make_grating(o1,0,k,fullsize/2,fullsize) + stim.make_grating(o2,np.pi/2,k,fullsize/2,fullsize) for o2 in np.concatenate([[0],np.logspace(-2,0,args["npnt"])]) for o1 in np.concatenate([[0],np.logspace(-2,0,args["npnt"])])] for k in pars["wavelengths"]]
+    LF = lambda c1,c2,k:stim.make_grating(c1,0,k,fullsize/2,fullsize) + stim.make_grating(c2,np.pi/2,k,fullsize/2,fullsize)
+
+    grats = [[LF(cc[0],cc[1],k) for o2 in np.logspace(-2,0,args["npnt"]) for cc in [[o2,o2],[0,o2],[o2,0]]] for k in pars["wavelengths"]]
+
 elif args["type"] == "COS_rot":
     grats = [[stim.make_grating(o1,-np.pi/4,k,fullsize/2,fullsize) + stim.make_grating(o2,np.pi/4,k,fullsize/2,fullsize) for o2 in np.concatenate([[0],np.logspace(-2,0,args["npnt"])]) for o1 in np.concatenate([[0],np.logspace(-2,0,args["npnt"])])] for k in pars["wavelengths"]]
 elif args["type"] == "SPONT":
@@ -180,7 +183,7 @@ for f1 in range(len(FF)):
 QQ = [[inference.Q_self_con(data["C"][k][m],FF[k][m]) for m in range(len(data["F"][k]))] for k in range(len(data["F"]))]
 #QQ = [[args["dt"]*m for m in f] for f in data["Q"]]
 
-if args["TA"]==0:
+if args["TA"]==0 and False:
     NC = [[m/(args["snr"]**2) for m in f] for f in data["C"]]
 else:
     nlist = np.zeros([len(indices),len(indices)])
