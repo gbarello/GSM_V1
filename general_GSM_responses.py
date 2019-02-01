@@ -101,7 +101,9 @@ elif args["type"] == "COS":
 elif args["type"] == "full_COS":
     LF = lambda c1,c2,k:stim.make_grating(c1,0,k,fullsize/2,fullsize) + stim.make_grating(c2,np.pi/4,k,fullsize/2,fullsize)
 
-    grats = [[LF(o1,o2,k) for o2 in np.logspace(-2,0,args["npnt"]) for o1 in np.logspace(-2,0,args["npnt"])] for k in pars["wavelengths"]]
+    c = np.concatenate([[0],np.logspace(-2,0,args["npnt"])])
+    
+    grats = [[LF(o1,o2,k) for o2 in c for o1 in c] for k in pars["wavelengths"]]
 
 elif args["type"] == "COS_rot":
     grats = [[stim.make_grating(o1,-np.pi/4,k,fullsize/2,fullsize) + stim.make_grating(o2,np.pi/4,k,fullsize/2,fullsize) for o2 in np.concatenate([[0],np.logspace(-2,0,args["npnt"])]) for o1 in np.concatenate([[0],np.logspace(-2,0,args["npnt"])])] for k in pars["wavelengths"]]
