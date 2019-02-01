@@ -90,7 +90,7 @@ elif args["type"] == "CRF":
     grats = [[stim.make_grating(o,0,k,fullsize/2,fullsize) for o in np.linspace(.1,1,args["npnt"])] for k in pars["wavelengths"]]
     
 elif args["type"] == "WTA":
-    grats = [[stim.make_grating(c2,o,k,fullsize/2,fullsize) + stim.make_grating(c,o+np.pi/4,k,fullsize/2,fullsize) for o in np.linspace(0,np.pi,args["npnt"]) for c1 in [0,.05,.1,.25,.5,1.] for c2 in [0,1]] for k in pars["wavelengths"]]
+    grats = [[stim.make_grating(c2,o,k,fullsize/2,fullsize) + stim.make_grating(c1,o+np.pi/2,k,fullsize/2,fullsize) for o in np.linspace(0,np.pi,args["npnt"]) for c1 in [0,.05,.1,.25,.5,1.] for c2 in [0,1]] for k in pars["wavelengths"]]
 elif args["type"] == "CRF_90":
     grats = [[stim.make_grating(o,np.pi/2,k,fullsize/2,fullsize) for o in np.linspace(.1,1,args["npnt"])] for k in pars["wavelengths"]]
 elif args["type"] == "COS":
