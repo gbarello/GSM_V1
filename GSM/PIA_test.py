@@ -36,7 +36,7 @@ def att_PIA_iter(method,I,a,cov,ncov,qcov,F):
     out = ldfi
 
     mu = dot([fi,I[-1]])
-    xi = dot([fi.transpose(),Q + ncov,fi])
+    xi = dot([fi,Q + ncov,fi.transpose()])
 
     if method == 1:
         iterator = iterate_1
@@ -145,13 +145,13 @@ def iterate_3(mu,xi,I,C,Q,ncov,F,n):
 
 def big_PIA_comp(I,a,cov,ncov,F,G):
     def C(n,m):
-        gchol = np.linalg.cholesky(a*a*cov)
-        nchol = np.linalg.cholesky(ncov)
+        g = a*a*cov
+        N = ncov
         
-        A = dot([gchol,np.linalg.matrix_power(F,abs(m-n)),gchol.conj().T])#,a*a*cov)
-        B = dot([nchol,np.linalg.matrix_power(G,abs(m-n)),nchol.conj().T])#,ncov)
+        A = dot([np.linalg.matrix_power(F,abs(m-n)),g])#,a*a*cov)
+        B = dot([np.linalg.matrix_power(G,abs(m-n)),N])#,ncov)
 
-        if m >= n:
+        if m <= n:
             return A+B
         else:
             return (A+B).transpose()
@@ -175,18 +175,18 @@ if __name__ == "__main__":
     def mat_sq(m):
         return np.dot(m,m.transpose())
     
-    I = np.random.randn(100,10)#np.ones([100,10])
+    I = np.random.randn(20,10)#np.ones([100,10])
     
     a = 2.
     cov = mat_sq(np.random.randn(10,10))
     ncov = mat_sq(np.random.randn(10,10))
 
-    F = .9*np.eye(10)
+    F = .1*mat_sq(np.random.randn(10,10))
     
     qcov = Q_self_con(cov,F)#mat_sq(np.random.randn(10,10))
     print("Testing PIA")
 
-    for m in [1,2,3]:
+    for m in [2]:
         p1 = att_PIA_iter(m,I,a,cov,ncov,qcov,F)
         print(p1)
 
