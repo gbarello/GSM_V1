@@ -91,6 +91,10 @@ elif args["type"] == "CRF":
     
 elif args["type"] == "WTA":
     grats = [[stim.make_grating(c2,o,k,fullsize/2,fullsize) + stim.make_grating(c1,o+np.pi/2,k,fullsize/2,fullsize) for o in np.linspace(0,np.pi,args["npnt"]) for c1 in [0,.05,.1,.25,.5,1.] for c2 in [0,1]] for k in pars["wavelengths"]]
+elif args["type"] == "carandini_rep":
+    grats = [[stim.make_grating(c1,0,k,fullsize/2,fullsize) + stim.make_grating(c2,np.pi/4,k,fullsize/2,fullsize) for c2 in np.logspace(-2,0,args["npnt"]) for c1 in [.02,.05,.10,.25,.50,1]] for k in pars["wavelengths"]]
+elif args["type"] == "stiff_carandini_rep":
+    grats = [[stim.make_grating(c1,0,k,fullsize/2,fullsize) + stim.make_grating(c2,np.pi/2,k,fullsize/2,fullsize) for c2 in np.logspace(-2,0,args["npnt"]) for c1 in [.02,.05,.10,.25,.50,1]] for k in pars["wavelengths"]]
 elif args["type"] == "CRF_90":
     grats = [[stim.make_grating(o,np.pi/2,k,fullsize/2,fullsize) for o in np.linspace(.1,1,args["npnt"])] for k in pars["wavelengths"]]
 elif args["type"] == "COS":
