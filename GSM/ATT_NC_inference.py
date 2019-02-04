@@ -722,8 +722,8 @@ if __name__ == "__main__":
     def make_offd(a,b,c,N):
         return a*np.eye(N) + b*np.diag(np.ones(N-1),1) + c*np.diag(np.ones(N-1),-1)
     
-    F = .99*np.eye(10)
-    G = .1*np.eye(10)#make_offd(.2,.1,.3,10)
+    F = .2*make_offd(.25,.05,.2,10)
+    G = .1*make_offd(.2,.1,.3,10)
     
     qcov = Q_self_con(cov,F)#mat_sq(np.random.randn(10,10))
     ucov = Q_self_con(ncov,G)#)ncov#.1*mat_sq(np.random.randn(10,10))
