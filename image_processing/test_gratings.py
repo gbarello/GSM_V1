@@ -4,7 +4,7 @@ import math
 from scipy import signal
 
 ##these functions make gratings (s and c)
-def GRATS(con,a,k,s,t,surr = "mean",l = .25):
+def GRATS(con,a,k,s,t,surr = "mean",l = .25,A = lambda c:1):
     
     c = float(con)
 
@@ -17,14 +17,14 @@ def GRATS(con,a,k,s,t,surr = "mean",l = .25):
     v2 = np.cos(a)
     t2 = float(t-1)/2
     if l == 0:
-        sin = np.array([[1. + c*np.sin(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k) if (float(x) - t2)**2 + (float(y) - t2)**2 < s**2 else sur for x in range(t)] for y in range(t)])
+        sin = np.array([[A(c)*(1. + c*np.sin(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) if (float(x) - t2)**2 + (float(y) - t2)**2 < s**2 else sur for x in range(t)] for y in range(t)])
     else:
         mask = np.sqrt(np.array([[(float(x) - t2)**2 + (float(y) - t2)**2 for x in range(t)] for y in range(t)]))
         
         mask = 1./(1 + np.exp((mask - s)/l))
 
         sur = np.array([[sur for x in range(t)] for y in range(t)])
-        sin = np.array([[(1. + c*np.sin(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) for x in range(t)] for y in range(t)])
+        sin = np.array([[A(c)*(1. + c*np.sin(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) for x in range(t)] for y in range(t)])
 
         sin = sin*mask + sur *(1. - mask)
         
@@ -33,7 +33,7 @@ def GRATS(con,a,k,s,t,surr = "mean",l = .25):
 
     return sin
 
-def GRATC(con,a,k,s,t,surr = "mean",l = .25):
+def GRATC(con,a,k,s,t,surr = "mean",l = .25,A = lambda c:1):
     
     c = float(con)
 
@@ -47,14 +47,14 @@ def GRATC(con,a,k,s,t,surr = "mean",l = .25):
     t2 = float(t-1)/2
 
     if l == 0:
-        sin = np.array([[1. + c*np.cos(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k) if (float(x) - t2)**2 + (float(y) - t2)**2 < s**2 else sur for x in range(t)] for y in range(t)])
+        sin = np.array([[A(c)*(1. + c*np.cos(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) if (float(x) - t2)**2 + (float(y) - t2)**2 < s**2 else sur for x in range(t)] for y in range(t)])
     else:
         mask = np.sqrt(np.array([[(float(x) - t2)**2 + (float(y) - t2)**2 for x in range(t)] for y in range(t)]))
         
         mask = 1./(1 + np.exp((mask - s)/l))
 
         sur = np.array([[sur for x in range(t)] for y in range(t)])
-        sin = np.array([[(1. + c*np.cos(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) for x in range(t)] for y in range(t)])
+        sin = np.array([[A(c)*(1. + c*np.cos(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) for x in range(t)] for y in range(t)])
 
         sin = sin*mask + sur *(1. - mask)
         
@@ -65,7 +65,7 @@ def GRATC(con,a,k,s,t,surr = "mean",l = .25):
 
 #these function make "surround" gratings
 
-def s_GRATS(con,a,k,s,t,surr = "mean",l = .25):
+def s_GRATS(con,a,k,s,t,surr = "mean",l = .25,A = lambda c:1):
     
     c = float(con)
 
@@ -79,14 +79,14 @@ def s_GRATS(con,a,k,s,t,surr = "mean",l = .25):
 
     t2 = float(t)/2
     if l == 0:
-        sin = np.array([[1. + c*np.sin(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k) if (float(x) - t2)**2 + (float(y) - t2)**2 >= s**2 else sur for x in range(t)] for y in range(t)])
+        sin = np.array([[A(c)*(1. + c*np.sin(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) if (float(x) - t2)**2 + (float(y) - t2)**2 >= s**2 else sur for x in range(t)] for y in range(t)])
     else:
         mask = np.sqrt(np.array([[(float(x) - t2)**2 + (float(y) - t2)**2 for x in range(t)] for y in range(t)]))
         
         mask = 1./(1 + np.exp((mask - s)/l))
 
         sur = np.array([[sur for x in range(t)] for y in range(t)])
-        sin = np.array([[(1. + c*np.sin(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) for x in range(t)] for y in range(t)])
+        sin = np.array([[A(c)*(1. + c*np.sin(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) for x in range(t)] for y in range(t)])
 
         sin = sur*mask + sin*(1. - mask)
         
@@ -95,7 +95,7 @@ def s_GRATS(con,a,k,s,t,surr = "mean",l = .25):
 
     return sin
 
-def s_GRATC(con,a,k,s,t,surr = "mean",l = .25):
+def s_GRATC(con,a,k,s,t,surr = "mean",l = .25,A = lambda c:1):
     
     c = float(con)
 
@@ -108,14 +108,14 @@ def s_GRATC(con,a,k,s,t,surr = "mean",l = .25):
     v2 = np.cos(a)
     t2 = float(t)/2
     if l == 0:
-        sin = np.array([[1. + c*np.cos(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k) if (float(x) - t2)**2 + (float(y) - t2)**2 >= s**2 else sur for x in range(t)] for y in range(t)])
+        sin = np.array([[A(c)*(1. + c*np.cos(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) if (float(x) - t2)**2 + (float(y) - t2)**2 >= s**2 else sur for x in range(t)] for y in range(t)])
     else:
         mask = np.sqrt(np.array([[(float(x) - t2)**2 + (float(y) - t2)**2 for x in range(t)] for y in range(t)]))
         
         mask = 1./(1 + np.exp((mask - s)/l))
 
         sur = np.array([[sur for x in range(t)] for y in range(t)])
-        sin = np.array([[(1. + c*np.cos(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) for x in range(t)] for y in range(t)])
+        sin = np.array([[A(c)*(1. + c*np.cos(2*math.pi*((v1*(float(x)-t2)) + (v2*(float(y)-t2)))/k)) for x in range(t)] for y in range(t)])
 
         sin = sin*mask + sur *(1. - mask)        
 
