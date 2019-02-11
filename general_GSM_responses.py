@@ -21,8 +21,16 @@ parser.add_argument("--noiseless",action = 'store_true',default = False,help = "
 parser.add_argument("--variance",action = 'store_true',default = False,help = "Flag to calculate the uncertainty, P instead of the mean response.")
 parser.add_argument("--amax",action = 'store_true',default = False,help = "Flag to calculate the MAP value of a.")
 parser.add_argument("--tag",default = "",help = "A prefix to add to the output.")
+parser.add_argument("--contrast_scaling",default = 1.,help = "scaling factor of the gratings. Default: 1. If 0 rescale to [0,1]",type = float)
 
 args = vars(parser.parse_args())
+
+if args["contrast_scaling"] == 0:
+    A = lambda c: 1./(1. + c)
+else:
+    A = lambda c:args["contrast_scaling"]
+
+args["tag"] += "A-{}_".format(args["contrast_scaling"])
 
 print("Stimulus type: {}".format(args["type"]))
 
@@ -81,50 +89,50 @@ fullsize = int(5*max(pars["wavelengths"]) + 2*np.max(f_pos))
 minwav = np.min(pars["wavelengths"])
 
 if args["type"] == "size_tuning":
-    grats = [[stim.make_grating(c,0,k,int(s),fullsize) for s in np.linspace(0,int(fullsize/2),args["npnt"]) for c in np.linspace(0,1,11)] for k in pars["wavelengths"]]
+    grats = [[stim.make_grating(c,0,k,int(s),fullsize,A=A) for s in np.linspace(0,int(fullsize/2),args["npnt"]) for c in np.linspace(0,1,11)] for k in pars["wavelengths"]]
 elif args["type"] == "single_FF":
-    grats = [[stim.make_grating(args["con"],0,k,int(2*fullsize),fullsize)] for k in pars["wavelengths"]]
+    grats = [[stim.make_grating(args["con"],0,k,int(2*fullsize),fullsize, A = A)] for k in pars["wavelengths"]]
 elif args["type"] == "ori_tuning":
-    grats = [[stim.make_grating(args["con"],o,k,fullsize/2,fullsize) for o in np.linspace(0,np.pi,args["npnt"])] for k in pars["wavelengths"]]
+    grats = [[stim.make_grating(args["con"],o,k,fullsize/2,fullsize, A = A) for o in np.linspace(0,np.pi,args["npnt"])] for k in pars["wavelengths"]]
 elif args["type"] == "CRF":
-    grats = [[stim.make_grating(o,0,k,fullsize/2,fullsize) for o in np.linspace(.1,1,args["npnt"])] for k in pars["wavelengths"]]
+    grats = [[stim.make_grating(o,0,k,fullsize/2,fullsize, A = A) for o in np.linspace(.1,1,args["npnt"])] for k in pars["wavelengths"]]
     
 elif args["type"] == "WTA":
-    grats = [[stim.make_grating(c2,o,k,fullsize/2,fullsize) + stim.make_grating(c1,o+np.pi/2,k,fullsize/2,fullsize) for o in np.linspace(0,np.pi,args["npnt"]) for c1 in [0,.05,.1,.25,.5,1.] for c2 in [0,1]] for k in pars["wavelengths"]]
+    grats = [[stim.make_grating(c2,o,k,fullsize/2,fullsize, A = A) + stim.make_grating(c1,o+np.pi/2,k,fullsize/2,fullsize, A = A) for o in np.linspace(0,np.pi,args["npnt"]) for c1 in [0,.05,.1,.25,.5,1.] for c2 in [0,1]] for k in pars["wavelengths"]]
 elif args["type"] == "carandini_rep":
-    grats = [[stim.make_grating(c1,0,k,fullsize/2,fullsize) + stim.make_grating(c2,np.pi/4,k,fullsize/2,fullsize) for c2 in np.logspace(-2,0,args["npnt"]) for c1 in [.02,.05,.10,.25,.50,1]] for k in pars["wavelengths"]]
+    grats = [[stim.make_grating(c1,0,k,fullsize/2,fullsize, A = A) + stim.make_grating(c2,np.pi/4,k,fullsize/2,fullsize, A = A) for c2 in np.logspace(-2,0,args["npnt"]) for c1 in [.02,.05,.10,.25,.50,1]] for k in pars["wavelengths"]]
 elif args["type"] == "stiff_carandini_rep":
-    grats = [[stim.make_grating(c1,0,k,fullsize/2,fullsize) + stim.make_grating(c2,np.pi/2,k,fullsize/2,fullsize) for c2 in np.logspace(-2,0,args["npnt"]) for c1 in [.02,.05,.10,.25,.50,1]] for k in pars["wavelengths"]]
+    grats = [[stim.make_grating(c1,0,k,fullsize/2,fullsize, A = A) + stim.make_grating(c2,np.pi/2,k,fullsize/2,fullsize, A = A) for c2 in np.logspace(-2,0,args["npnt"]) for c1 in [.02,.05,.10,.25,.50,1]] for k in pars["wavelengths"]]
 elif args["type"] == "CRF_90":
-    grats = [[stim.make_grating(o,np.pi/2,k,fullsize/2,fullsize) for o in np.linspace(.1,1,args["npnt"])] for k in pars["wavelengths"]]
+    grats = [[stim.make_grating(o,np.pi/2,k,fullsize/2,fullsize, A = A) for o in np.linspace(.1,1,args["npnt"])] for k in pars["wavelengths"]]
 elif args["type"] == "COS":
-    LF = lambda c1,c2,k:stim.make_grating(c1,0,k,fullsize/2,fullsize) + stim.make_grating(c2,np.pi/2,k,fullsize/2,fullsize)
+    LF = lambda c1,c2,k:stim.make_grating(c1,0,k,fullsize/2,fullsize, A = A) + stim.make_grating(c2,np.pi/2,k,fullsize/2,fullsize, A = A)
 
     grats = [[LF(cc[0],cc[1],k) for o2 in np.logspace(-2,0,args["npnt"]) for cc in [[o2,o2],[0,o2],[o2,0]]] for k in pars["wavelengths"]]
 
 elif args["type"] == "full_COS":
-    LF = lambda c1,c2,k:stim.make_grating(c1,0,k,fullsize/2,fullsize) + stim.make_grating(c2,np.pi/4,k,fullsize/2,fullsize)
+    LF = lambda c1,c2,k:stim.make_grating(c1,0,k,fullsize/2,fullsize, A = A) + stim.make_grating(c2,np.pi/4,k,fullsize/2,fullsize, A = A)
 
     c = np.concatenate([[0],np.logspace(-2,0,args["npnt"])])
     
     grats = [[LF(o1,o2,k) for o2 in c for o1 in c] for k in pars["wavelengths"]]
 
 elif args["type"] == "COS_rot":
-    grats = [[stim.make_grating(o1,-np.pi/4,k,fullsize/2,fullsize) + stim.make_grating(o2,np.pi/4,k,fullsize/2,fullsize) for o2 in np.concatenate([[0],np.logspace(-2,0,args["npnt"])]) for o1 in np.concatenate([[0],np.logspace(-2,0,args["npnt"])])] for k in pars["wavelengths"]]
+    grats = [[stim.make_grating(o1,-np.pi/4,k,fullsize/2,fullsize, A = A) + stim.make_grating(o2,np.pi/4,k,fullsize/2,fullsize, A = A) for o2 in np.concatenate([[0],np.logspace(-2,0,args["npnt"])]) for o1 in np.concatenate([[0],np.logspace(-2,0,args["npnt"])])] for k in pars["wavelengths"]]
 elif args["type"] == "SPONT":
-    grats = [[0*stim.make_grating(0,0,k,fullsize/2,fullsize)] for k in pars["wavelengths"]]
+    grats = [[0*stim.make_grating(0,0,k,fullsize/2,fullsize, A = A)] for k in pars["wavelengths"]]
 elif args["type"] == "surround_suppression":
     import image_processing.test_gratings as test
 
-    LF = [lambda c,a,k,r,T: test.GRATC(c,a,k,r,T),
-          lambda c,a,k,r,T: test.GRATC(c,a,k,r,T)
+    LF = [lambda c,a,k,r,T: test.GRATC(c,a,k,r,T, A = A),
+          lambda c,a,k,r,T: test.GRATC(c,a,k,r,T, A = A)
           +
-          test.s_GRATC(1.,a + np.pi/2,k,r,T,surr = 0.)]
+          test.s_GRATC(1.,a + np.pi/2,k,r,T,surr = 0., A = A)]
 
     grats = [[f(o,0,k,2*k*pars["filter_distance"]/3,fullsize) for o in np.logspace(-2,0,args["npnt"]) for f in LF] for k in pars["wavelengths"]]
     
 elif args["type"] == "test":
-    grats = [[stim.make_grating(o,0,k,fullsize/2,fullsize) for o in [.5]] for k in pars["wavelengths"][:1]]
+    grats = [[stim.make_grating(o,0,k,fullsize/2,fullsize, A = A) for o in [.5]] for k in pars["wavelengths"][:1]]
 
 elif args["type"] == "MI":
     import att_MGSM_responses as aresp

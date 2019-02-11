@@ -19,12 +19,12 @@ def make_SS_filters(con,nfilt,nang,npha,freq,scale,tot,fdist,get_grat = False):
     
     return np.array([c*filt for c in con])#(filt-np.array([[[dif]]]))/np.array([[[fac]]])
 
-def make_grating(con,angle,freq,rad,tot,phase = "c"):
+def make_grating(con,angle,freq,rad,tot,phase = "c",A = lambda c:1):
 
     if phase == "c":
-        return test.GRATC(con,angle,freq,rad,tot)
+        return test.GRATC(con,angle,freq,rad,tot,A = A)
     elif phase == "s":
-        return test.GRATS(con,angle,freq,rad,tot)
+        return test.GRATS(con,angle,freq,rad,tot,A = A)
         
 
 def make_OTUNE_filters(con,nfilt,nang,npha,freq,scale,tot,fdist,R):
