@@ -54,7 +54,7 @@ def cov(n,w,dr = 0):
 def cov_special(n,w,dr = 0):
 
     if w == 0:
-v        return np.identity(n)
+        return np.identity(n)
     elif w == -1:
         return np.ones([n,n])
     else:
@@ -272,10 +272,13 @@ def run_WDIFF_plots(noise = 0):
 
     NUM_CURVE = 10
     NUM_CON = 50
-    NUM_W = 20
+    NUM_W = 10
     
-    CMAX = 1.
-    CMIN = -2.
+    #CMAX = 1.
+    #CMIN = -2.
+    CMAX = 10
+    CMIN = 0
+
     N = 8
 
     I1 = inp(N,.6,1,1,-1 + N/2)
@@ -284,8 +287,45 @@ def run_WDIFF_plots(noise = 0):
 
     WW = np.logspace(-1,1,NUM_CURVE)
 
-    con = np.logspace(CMIN,CMAX,NUM_CON)
+    con = np.linspace(CMIN,CMAX,NUM_CON)
 
+    def run_KW(k,w):
+        resp1.append([])
+        resp2.append([])
+        resp3.append([])
+
+        nresp1.append([])
+        nresp2.append([])
+        nresp3.append([])
+
+        W = w
+        CC = cov(N,.6)
+        
+        NC = cov(N,.6*w)
+        
+        NC = NC*np.linalg.norm(CC)/np.linalg.norm(NC)
+        
+        NN = 0*np.random.multivariate_normal(np.zeros(len(NC)),NC,[3,NUM_CON])
+        
+        stim1 = np.array([cc * I1 for cc in con])
+        stim2 = np.array([cc * I2 for cc in con])
+        stim3 = np.array([cc * I3 for cc in con])
+        
+        resp1[-1].append(MGSM.gexp(0,stim1 + NN[0]/(k),CC,NC/(k*k)))
+        resp2[-1].append(MGSM.gexp(0,stim2 + NN[1]/(k),CC,NC/(k*k)))
+        resp3[-1].append(MGSM.gexp(0,stim3 + NN[2]/(k),CC,NC/(k*k)))
+        
+        nresp1[-1].append(MGSM.gnn(stim1 + 0*NN[0]/(k),CC)[:,0])
+        nresp2[-1].append(MGSM.gnn(stim2 + 0*NN[0]/(k),CC)[:,0])
+        nresp3[-1].append(MGSM.gnn(stim3 + 0*NN[0]/(k),CC)[:,0])
+
+    for snr in WW:
+        run_KW(snr,1)
+        
+    for w in np.linspace(.1,2,NUM_W):
+        run_KW(1,w)
+
+    '''
     for w in np.linspace(.01,2,10):
         print(w)
         resp1.append([])
@@ -317,7 +357,9 @@ def run_WDIFF_plots(noise = 0):
             nresp1[-1].append(MGSM.gnn(stim1 + 0*NN[0]/(k),CC)[:,0])
             nresp2[-1].append(MGSM.gnn(stim2 + 0*NN[0]/(k),CC)[:,0])
             nresp3[-1].append(MGSM.gnn(stim3 + 0*NN[0]/(k),CC)[:,0])
+    '''
 
+    
     resp1 = np.array(resp1)
     resp2 = np.array(resp2)
     resp3 = np.array(resp3)
@@ -459,16 +501,20 @@ def run_cov():
 
 if __name__ == "__main__":
     import utilities as utils
-
+    import time
     out = []
-
-    for k in range(500):
+    NRUN = 1
+    for k in range(NRUN):
         print(k)
+        t1 = time.time()
         res = run_WDIFF_plots()
+        t2 = time.time()
 
+        if k > 0:
+            print("Time Left: {} minutes".format(((t2 - t1) * (NRUN - k))/60))
         out.append(res)
 
-        utils.dump_file("./inference/more_TA_param_model_stuff.pkl",out)
+        utils.dump_file("./inference/TAstim_TA_param_model_stuff.pkl",out)
     
 #    run_k()
     #run_cov()

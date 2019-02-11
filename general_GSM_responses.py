@@ -19,6 +19,7 @@ parser.add_argument("--pad",type = int,default = 0,help = "Pad stim with {pad} z
 parser.add_argument("--fexp",action = 'store_true',default = False,help = "Use the proper rescaling of F based on matrix logs and exponents.")
 parser.add_argument("--noiseless",action = 'store_true',default = False,help = "Run the noiseless case.")
 parser.add_argument("--variance",action = 'store_true',default = False,help = "Flag to calculate the uncertainty, P instead of the mean response.")
+parser.add_argument("--print_inp",action = 'store_true',default = False,help = "Flag to print the filter inputs.")
 parser.add_argument("--amax",action = 'store_true',default = False,help = "Flag to calculate the MAP value of a.")
 parser.add_argument("--tag",default = "",help = "A prefix to add to the output.")
 
@@ -168,6 +169,11 @@ if args["time"] > -1:
 path = [coeffs.shape[-1]/2 for k in range(args["n_frame"])]
 print(path)
 rundat = np.array([[make_data.sample_path(c,path,indices,positions) for c in C] for C in coeffs])/np.array([[[data["fac"]]]])
+
+if args["print_inp"]:
+    print(rundat[-1][-1][0])
+    print(data["C"][0][0][0])
+    exit()
 
 #get just the vertically oriented filters
 ind = [k for k in range(len(indices)) if (indices[k][0] == 0 and positions[k][0] == 0 and positions[k][1] == 0)]
