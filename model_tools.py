@@ -147,6 +147,9 @@ def get_segmentation(seg_type,nang,wave,fpos):
             seg.append([flat(indices[0]) + flat(indices[1:,i])] + [flat(indices[1:,k]) for k in range(nang) if k != i])
 
         return seg
+    else:
+        print("segmentation not recognized.")
+        exit()
 
 if __name__ == "__main__":
     if 0:
