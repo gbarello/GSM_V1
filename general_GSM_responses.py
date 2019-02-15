@@ -132,6 +132,16 @@ elif args["type"] == "surround_suppression":
 
     grats = [[f(o,0,k,2*k*pars["filter_distance"]/3,fullsize) for o in np.logspace(-2,0,args["npnt"]) for f in LF] for k in pars["wavelengths"]]
     
+elif args["type"] == "rot_surround_suppression":
+    import image_processing.test_gratings as test
+
+    LF = [lambda c,a,k,r,T: test.GRATC(c,a,k,r,T, A = A),
+          lambda c,a,k,r,T: test.GRATC(c,a,k,r,T, A = A)
+          +
+          test.s_GRATC(1.,a + np.pi/4,k,r,T,surr = 0., A = A)]
+
+    grats = [[f(o,0,k,k*pars["filter_distance"],fullsize) for o in np.logspace(-2,0,args["npnt"]) for f in LF] for k in pars["wavelengths"]]
+    
 elif args["type"] == "test":
     grats = [[stim.make_grating(o,0,k,fullsize/2,fullsize, A = A) for o in [.5]] for k in pars["wavelengths"][:1]]
 
