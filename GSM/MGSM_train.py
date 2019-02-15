@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-import MGSM_inference as MGSM
+import ATT_GSM_inference as MGSM
 import math
 import glob
 

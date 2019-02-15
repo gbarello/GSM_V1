@@ -1,5 +1,7 @@
 import utilities as utils
 import argparse
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]= "1"
 
 parser = argparse.ArgumentParser()
 

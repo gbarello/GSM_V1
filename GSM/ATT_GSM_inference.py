@@ -752,6 +752,128 @@ def get_att_CC_seg_weight(X1,X2,CC,CCS,CS,NCC,NCCS,NCS,QCC,QCCS,QCS,FCC,FCCS,FCS
 
     return PROB/NORM
 
+def take_GSM_step(x,cchol,qchol,Fc,steps = 1,lr = .01,weights = [],fq_shared = False,f_ID = False):
+
+    '''
+    if fq shared then fix F and Q to be self-consistent according to S = F.S.F + Q
+
+    
+    '''
+
+    if f_ID:
+        fq_shared = True
+        F = np.eye(x.shape[2])*sigmoid(Fc)
+    else:
+        F = Fc
+
+    if weights is []:
+        W = np.ones(x.shape[0])
+    else:
+        W = weights
+
+    W = W/np.sum(W)
+
+    CC = cchol
+    QQ = qchol
+    FF = Fc
+
+    LR = lr
+
+    L1 = np.mean(att_LogLikelihood(x,cchol,qchol,F,mean = False,fq_shared = fq_shared)*W,axis = 0)
+
+    step = 0
+    if f_ID:
+        dc,dq,df = f_LP_att_grad(x,cchol,np.sqrt(1.-(Fc*Fc))*cchol,F,False)
+    else:
+        dc,dq,df = f_LP_att_grad(x,cchol,qchol,F,fq_shared)
+
+    if f_ID:
+        df = np.sum(np.diagonal(df,axis1=1,axis2=2),axis = 1) - 2 * Fc * np.sum(dq * np.expand_dims(vtoS(CC),0),axis = (1,2))
+        dc += np.sqrt(1. - Fc*Fc)*dq
+        
+    elif fq_shared:
+        df += - 2 * np.tensordot(dq,np.dot(vtoS(CC),FF),axes = [1,1])
+        
+    while step != steps and step < 10000:
+        step += 1
+
+        if f_ID:
+            FF += np.mean(dsigmoid(df) * W)*LR
+            QQ = Q_self_con(vtoS(CC),sigmoid(FF)*np.eye(len(F)))
+            
+        else:
+            FF += np.mean(df * np.reshape(W,[-1,1,1]),axis = 0)*LR
+        
+        if fq_shared:
+            QQ = Q_self_con(vtoS(CC),FF)
+        else:
+            QQ += np.mean(dq * np.reshape(W,[-1,1]),axis = 0) * LR
+            
+        CC += np.mean(dc * np.reshape(W,[-1,1]),axis = 0)*LR
+
+        L2 = np.mean(att_LogLikelihood(x,CC,QQ,sigmoid(FF)*np.eye(len(F)),mean = False,fq_shared = fq_shared)*W,axis = 0)
+
+        if L2 < L1:
+            LR *= -1./2
+        else:
+            LR *= 1.1
+        if np.abs((L2 - L1)/LR) < 1e-10:
+            break
+        L1 = L2
+
+    return CC,QQ,FF
+
+def take_FID_GSM_step(x,cchol,F,steps = 1,lr = .01,weights = []):
+
+    '''
+    if fq shared then fix F and Q to be self-consistent according to S = F.S.F + Q
+    furthermore, require that F be proportional to teh identity
+    '''
+
+
+    Fmat = np.eye(x.shape[2])*sigmoid(F)
+    fval = sigmoid(F)
+    
+    if weights is []:
+        W = np.ones(x.shape[0])
+    else:
+        W = weights
+
+    W = W/np.sum(W)
+
+    qchol = np.sqrt(1. - fval*fval)*cchol
+
+    LR = lr
+
+    L1 = np.mean(att_LogLikelihood(x,cchol,qchol,Fmat,mean = False)*W,axis = 0)
+
+    step = 0
+
+    dc,df = f_LP_att_grad_FID(x,cchol,F)
+
+    ccopy = np.array(cchol,copy = True)
+    fcopy = np.float32(F,copy = True)
+
+    while step != steps and step < 10000:
+        step += 1
+
+        fcopy += np.mean(df * W)*LR
+        
+        QQ = Q_self_con(vtoS(ccopy),sigmoid(fcopy)*np.eye(len(Fmat)))
+        
+        ccopy += np.mean(dc * np.reshape(W,[-1,1]),axis = 0)*LR
+        
+        L2 = np.mean(att_LogLikelihood(x,ccopy,QQ,sigmoid(fcopy)*np.eye(len(Fmat)),mean = False,fq_shared = True)*W,axis = 0)
+
+        if L2 < L1:
+            LR *= -1./2
+        else:
+            LR *= 1.1
+        if np.abs((L2 - L1)/LR) < 1e-10:
+            break
+        L1 = L2
+    return ccopy,QQ,fcopy
+
 def mat_sq(m):
     return np.dot(m,m.transpose())
 
