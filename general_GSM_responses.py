@@ -11,7 +11,7 @@ parser.add_argument("--snr",type = float,default = 1.,help = "SNR of the noisy m
 parser.add_argument("--noise_tau",type = float,default = 0,help = "timescale of noise correlations.")
 parser.add_argument("--signal_tau",type = float,default = 0,help = "timescale of signal correlations.")
 parser.add_argument("--dt",type = float,default = 1.,help = "dt to run at, relative to the fit dt.")
-parser.add_argument("--con",type = float,default = .5,help = "contrast for the stimulus.")
+parser.add_argument("--con",type = float,default = 1.0,help = "contrast for the stimulus.")
 parser.add_argument("--npnt",type = int,default = 10,help = "Number of stimuli sampling points to use.")
 parser.add_argument("--TA",type = int,default = 0,help = "If nonzero, sample with noise and this number of samples.")
 parser.add_argument("--time",type = int,default = -1,help = "If nonzero, run for each number of timesteps up to {time}.")
@@ -23,6 +23,8 @@ parser.add_argument("--print_inp",action = 'store_true',default = False,help = "
 parser.add_argument("--amax",action = 'store_true',default = False,help = "Flag to calculate the MAP value of a.")
 parser.add_argument("--tag",default = "",help = "A prefix to add to the output.")
 parser.add_argument("--contrast_scaling",default = 1.,help = "scaling factor of the gratings. Default: 1. If 0 rescale to [0,1]",type = float)
+parser.add_argument("--aux_angle",default = 0.,help = "Auxillary angle (in multiples of pi) for certain stimuli.",type = float)
+parser.add_argument("--aux_scale",default = 1.,help = "Auxillary scale (in multiples of filter distance) for certain stimuli.",type = float)
 
 args = vars(parser.parse_args())
 
@@ -135,12 +137,14 @@ elif args["type"] == "surround_suppression":
 elif args["type"] == "rot_surround_suppression":
     import image_processing.test_gratings as test
 
+    args["tag"] += "aa-{}_as-{}".format(args["aux_angle"],args["aux_scale"])
+
     LF = [lambda c,a,k,r,T: test.GRATC(c,a,k,r,T, A = A),
           lambda c,a,k,r,T: test.GRATC(c,a,k,r,T, A = A)
           +
-          test.s_GRATC(1.,a + np.pi/4,k,r,T,surr = 0., A = A)]
+          test.s_GRATC(args["con"],a + args["aux_angle"],k,r,T,surr = 0., A = A)]
 
-    grats = [[f(o,0,k,k*pars["filter_distance"],fullsize) for o in np.logspace(-2,0,args["npnt"]) for f in LF] for k in pars["wavelengths"]]
+    grats = [[f(o,0,k,k*pars["filter_distance"]*args["aux_scale"],fullsize) for o in np.logspace(-2,0,args["npnt"]) for f in LF] for k in pars["wavelengths"]]
     
 elif args["type"] == "test":
     grats = [[stim.make_grating(o,0,k,fullsize/2,fullsize, A = A) for o in [.5]] for k in pars["wavelengths"][:1]]
