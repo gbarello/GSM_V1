@@ -6,7 +6,7 @@ parser = argparse.ArgumentParser()
 #filter parameters
 parser.add_argument("dir",type = str,help = "Directory of the model to run.")
 parser.add_argument("type",type = str,help = "type of stimuli to run",default = "size_tuning")
-parser.add_argument("--n_frame",type = int,default = 2,help = "number of time points to use in inference.")
+parser.add_argument("--n_frame",type = int,default = 1,help = "number of time points to use in inference.")
 parser.add_argument("--snr",type = float,default = 1.,help = "SNR of the noisy model.")
 parser.add_argument("--noise_tau",type = float,default = 0,help = "timescale of noise correlations.")
 parser.add_argument("--signal_tau",type = float,default = 0,help = "timescale of signal correlations.")
@@ -142,7 +142,10 @@ elif args["type"] == "rot_surround_suppression":
     LF = [lambda c,a,k,r,T: test.GRATC(c,a,k,r,T, A = A),
           lambda c,a,k,r,T: test.GRATC(c,a,k,r,T, A = A)
           +
-          test.s_GRATC(args["con"],a + args["aux_angle"],k,r,T,surr = 0., A = A)]
+          test.s_GRATC(args["con"],a + args["aux_angle"]*np.pi,k,r,T,surr = 0., A = A)]
+
+    if args["aux_scale"] < 0:
+        args["aux_scale"] = .2 * fullsize / (2 * pars["wavelengths"][0] * pars["filter_distance"])
 
     grats = [[f(o,0,k,k*pars["filter_distance"]*args["aux_scale"],fullsize) for o in np.logspace(-2,0,args["npnt"]) for f in LF] for k in pars["wavelengths"]]
     
