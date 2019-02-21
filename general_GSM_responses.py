@@ -142,13 +142,13 @@ elif args["type"] == "rot_surround_suppression":
     LF = [lambda c,a,k,r,T: test.GRATC(c,a,k,r,T, A = A),
           lambda c,a,k,r,T: test.GRATC(c,a,k,r,T, A = A)
           +
-          test.s_GRATC(args["con"],a + args["aux_angle"]*np.pi,k,r,T,surr = 0., A = A)]
+          test.s_GRATC(args["con"],a + args["aux_angle"]*np.pi,k,r,T,surr = 0., A = A,offset = 0)]
 
     if args["aux_scale"] < 0:
-        args["aux_scale"] = .2 * fullsize / (2 * pars["wavelengths"][0] * pars["filter_distance"])
+        args["aux_scale"] = .3 * fullsize / (2 * pars["wavelengths"][0] * pars["filter_distance"])
 
     grats = [[f(o,0,k,k*pars["filter_distance"]*args["aux_scale"],fullsize) for o in np.logspace(-2,0,args["npnt"]) for f in LF] for k in pars["wavelengths"]]
-    
+
 elif args["type"] == "test":
     grats = [[stim.make_grating(o,0,k,fullsize/2,fullsize, A = A) for o in [.5]] for k in pars["wavelengths"][:1]]
 
